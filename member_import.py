@@ -56,7 +56,6 @@ cursor = cnx.cursor()
 with open(csv_path, "r") as csvfile:
     reader = csv.DictReader(csvfile)
     for row in reader:
-        print('\033[2J')
         print(f"adding member {row['First name']} {row['Last name']}")
         cursor.execute(f"INSERT INTO mydb.member VALUES ({', '.join([field.type(row[field.id]).__repr__() for field in fields])})")
     print("commiting changes...")
