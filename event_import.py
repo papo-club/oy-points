@@ -119,8 +119,15 @@ non_members = []
 
 def import_result(member_id, result):
     time = result["Time"]
+    #TODO: account for DNS
     time = [int(time) for time in time.split(":")]
     time = [0] * (3 - len(time)) + time
+    if time[0] > 10 and time[2] == 0:
+        logging.warning(f"found bad time {':'.join([str(value).zfill(2) for value in time])}, correcting to 00:{':'.join([str(value).zfill(2) for value in time[0:2]])}")
+        time[0], time[1], time[2] = 0, time[0], time[1]
+        if time[0] > 24:
+            logging.error(f"found bad time {':'.join([str(value).zfill(2) for value in time])}, skipping entry")
+            time = None
 
     cursor.execute(f"""INSERT INTO mydb.result (
         member_idmember,
