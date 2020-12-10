@@ -7,6 +7,7 @@ from dateutil.parser import parse
 import datetime
 import logging
 from os import system
+import pprint
 
 def field_repr(*args):
     rep_arr = [field.__repr__() for field in args]
@@ -31,6 +32,8 @@ commit = False
 logging.basicConfig(level="INFO")
 
 cursor = cnx.cursor(dictionary=True)
+
+clear()
 
 cursor.execute(f"SELECT year FROM mydb.season")
 seasons = [str(year) for year in cursor.fetchall()[0].values()]
@@ -169,14 +172,26 @@ with open(csv_path, "r") as csvfile:
                             logging.warning(f"ADDING:match between {competitor} and {member} is not certain, but gender matches")
                             break
             else:
-                non_members.append(competitor)
-                # logging.info(f"no member could be found matching {competitor}, OMITTING (closest match: {result[0][0].replace('%', ' ')})")
-                # logging.warning(f"no membership found for competitor {competitor} ({competitor_dob}, {competitor_gender}), OMITTING") 
-                pass
+                non_members.append(
+                    [competitor.ljust(25),
+                    f"{result[0][1]}%",
+                    f"{competitor_gender}",
+                    f"DOB:{competitor_dob}".ljust(9),
+                    f"c:{result[0][0].replace('%', ' ')}"])
                 
         else:
-            non_members.append(competitor)
-            # logging.warning(f"no membership found for competitor {competitor} ({competitor_dob}, {competitor_gender}), OMITTING")
-            pass
+          non_members.append(
+            [competitor.ljust(25),
+            f"{result[0][1]}%",
+            f"{competitor_gender}",
+            f"DOB:{competitor_dob}".ljust(9),
+            f"c:None"])
 
-logging.info(f"non-members omitted in this import: {', '.join(non_members)}")
+non_members.sort(key=lambda x: x[1], reverse=True)
+logging.info(f"non-members omitted in this import:")
+print(*(' '.join(row) for row in non_members), sep='\n')
+print()
+i = input("press enter to continue import: ")
+if i == "n" or i == "no":
+    print("aborting...")
+    sys.exit()
