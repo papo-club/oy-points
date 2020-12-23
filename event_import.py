@@ -30,6 +30,35 @@ cursor = cnx.cursor(dictionary=True)
 
 clear()
 
+status_code = {
+    0: "OK",
+    1: "DNS",
+    2: "DNF",
+    3: "MP",
+    4: "DQ"
+}
+
+with open(".matchignore", "r") as matchignore:
+    matchignores = {}
+    for line in matchignore:
+        match1, match2 = [name.strip() for name in line.split(",")]
+        matchignores[match1.lower()] = match2.lower()
+
+def check_for_match_ignore(match1, match2):
+
+    match1 = match1.lower()
+    match2 = match2.lower()
+
+    for ignore1, ignore2 in matchignores.items():
+        if ignore1 in match1:
+            if ignore2 in match2:
+                return True
+        if ignore1 in match2:
+            if ignore2 in match1:
+                return True
+    
+    return False
+
 cursor.execute(f"SELECT year FROM mydb.season")
 seasons = [str(year) for year in cursor.fetchall()[0].values()]
 print("available seasons:", " ,".join(seasons))
@@ -111,23 +140,37 @@ members = [row["first_name"] + "%" + row["last_name"] for row in cursor.fetchall
 
 def get_details(member):
     first, last = member.split("%")
-    cursor.execute(f"SELECT idmember, DOB, gender FROM mydb.member WHERE first_name = %s AND last_name = %s", (first, last)) 
+    cursor.execute("SELECT idmember, DOB, gender FROM mydb.member WHERE first_name = %s AND last_name = %s", (first, last)) 
     a = cursor.fetchall()[0]
     return a["idmember"], a["DOB"], a["gender"] 
+
+def get_member_name(member_id):
+    cursor.execute("SELECT first_name, last_name FROM mydb.member WHERE idmember = %s", (member_id,))
+    a = cursor.fetchall()[0]
+    return a["first_name"] + " " + a["last_name"]
 
 non_members = []
 
 def import_result(member_id, result):
+    status = status_code[int(result["Classifier"])]
     time = result["Time"]
-    #TODO: account for DNS
-    time = [int(time) for time in time.split(":")]
-    time = [0] * (3 - len(time)) + time
-    if time[0] > 10 and time[2] == 0:
-        logging.warning(f"found bad time {':'.join([str(value).zfill(2) for value in time])}, correcting to 00:{':'.join([str(value).zfill(2) for value in time[0:2]])}")
-        time[0], time[1], time[2] = 0, time[0], time[1]
-        if time[0] > 24:
-            logging.error(f"found bad time {':'.join([str(value).zfill(2) for value in time])}, skipping entry")
+    if status not in ["DNS", "DNF"]:
+        if time:
+            #TODO: account for DNS
+            time = [int(time) for time in time.split(":")]
+            time = [0] * (3 - len(time)) + time
+            if time[0] > 10 and time[2] == 0:
+                time_repr = ':'.join([str(value).zfill(2) for value in time])
+                logging.warning(f"found bad time {time_repr}, correcting to 00:{':'.join([str(value).zfill(2) for value in time[0:2]])}")
+                time[0], time[1], time[2] = 0, time[0], time[1]
+                if time[0] > 24:
+                    logging.error(f"found bad time {time_repr}, skipping entry")
+                    time = None
+        else:
+            logging.error(f"could not find time for member #{member_id} ({get_member_name(member_id)}) despite status being {status}. Importing anyway")
             time = None
+    else:
+       time = None 
 
     cursor.execute(f"""INSERT INTO mydb.result (
         member_idmember,
@@ -135,14 +178,16 @@ def import_result(member_id, result):
         event_grades_event_num,
         event_grades_grade_idgrade, 
         time,
+        status,
         points
-        ) VALUES (%s, %s, %s, %s, %s, %s)""", 
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s)""", 
         (
             member_id,
             season,
             number,
             result["Short"],
-            datetime.time(*time),
+            datetime.time(*time) if time else None,
+            status,
             None
         ))
 
@@ -166,8 +211,11 @@ with open(csv_path, "r") as csvfile:
                     if member_dob.year == int(competitor_dob) and member_gender == competitor_gender:
                         import_result(member_id, field)
                     else:
-                        logging.warning(f"ADDING:details of {competitor} do not match with the members database")
-                        import_result(member_id, field)
+                        if check_for_match_ignore(competitor, member):
+                            logging.warning(f"OMMITING:ignored match between {competitor} and {member} because of .matchignore file")
+                        else:
+                            logging.warning(f"ADDING:details of {competitor} do not match with the members database")
+                            import_result(member_id, field)
 
                 else:
                     # logging.info(f"found competitor {competitor} but their gender or DOB is missing, ADDING")
@@ -182,19 +230,31 @@ with open(csv_path, "r") as csvfile:
                     if member_dob.year == int(competitor_dob) and member_gender == competitor_gender:
                         if re[1] >= 90:
                             import_result(member_id, field)
-                            pass
                         else:
-                            logging.warning(f"ADDING:match between {competitor} and {member} is not certain, but DOB and gender match")
-                            import_result(member_id, field) 
+                            if check_for_match_ignore(competitor, member):
+                                logging.warning(f"OMMITING:ignored match between {competitor} and {member} because of .matchignore file")
+                            else:
+                                logging.warning(f"ADDING:match between {competitor} and {member} is not certain, but DOB and gender match")
+                                import_result(member_id, field) 
+                        break
+                    else:
+                        logging.warning(f"OMITTING:match between {competitor} and {member} is likely but all details are different")
                         break
                 else:
-                    if re[1] >= 90:
+                    if re[1] >= 79:
                         if member_gender == competitor_gender:
-                            logging.warning(f"ADDING:match between {competitor} and {member} is not certain, but gender matches")
-                            import_result(member_id, field)
-                            break
+                            if check_for_match_ignore(competitor, member):
+                                logging.warning(f"OMMITING:ignored match between {competitor} and {member} because of .matchignore file")
+                            else:
+                                logging.warning(f"ADDING:match between {competitor} and {member} is not certain, but gender matches")
+                                import_result(member_id, field)
+                                break
                         else:
                             logging.warning(f"OMITTING:match between {competitor} and {member} is likely but all details are different")
+                    else:
+                        # logging.warning(f"OMMITING:match between  {competitor} and {member} is possible but unlikely")
+                        pass
+
 
             else:
                 non_members.append(
@@ -217,10 +277,10 @@ print(*(' '.join(row) for row in non_members), sep='\n')
 print()
 
 i = input("press enter to continue import: ")
-if i == "n" or i == "no":
+if i:
     print("aborting...")
     sys.exit()
 
 logging.info("importing results...")
-logging.info("done!")
 if commit: cnx.commit()
+logging.info("done!")
