@@ -1,14 +1,15 @@
+from mysql.connector.cursor import RE_SQL_INSERT_STMT
+import textdistance
+import re
 from fuzzywuzzy import process, fuzz
 import mysql.connector
 import csv
 import sys
-from enum import Enum
 from dateutil.parser import parse
 import datetime
-import logging
 from os import system
+from nickname_lookup import python_parser
 
-logging.basicConfig(level="INFO")
 
 def field_repr(*args):
     rep_arr = [field.__repr__() for field in args]
@@ -23,7 +24,7 @@ cnx = mysql.connector.connect(
     user="root",
     password="admin")
 
-csv_path = sys.argv[1]
+csv_paths = sys.argv[1:]
 commit = True
 
 cursor = cnx.cursor(dictionary=True)
@@ -38,27 +39,6 @@ status_code = {
     4: "DQ"
 }
 
-with open(".matchignore", "r") as matchignore:
-    matchignores = {}
-    for line in matchignore:
-        match1, match2 = [name.strip() for name in line.split(",")]
-        matchignores[match1.lower()] = match2.lower()
-
-def check_for_match_ignore(match1, match2):
-
-    match1 = match1.lower()
-    match2 = match2.lower()
-
-    for ignore1, ignore2 in matchignores.items():
-        if ignore1 in match1:
-            if ignore2 in match2:
-                return True
-        if ignore1 in match2:
-            if ignore2 in match1:
-                return True
-    
-    return False
-
 cursor.execute(f"SELECT year FROM mydb.season")
 seasons = [str(year) for year in cursor.fetchall()[0].values()]
 print("available seasons:", " ,".join(seasons))
@@ -72,21 +52,17 @@ while True:
         if season in seasons:
             break
         raise Exception
-    except:
-        print("that is not a valid season.")
+    except Exception as e:
+        print("that is not a valid season.")        
 
 while True:
     try:
-        number = int(input("event # in series: OY"))
+        number = int(input("🔢 event # in series: OY"))
         if 0 < number < 99:
             break
         else: raise Exception
     except:
-        print("that is not a valid event #.")
-
-while True:
-    name = input("create event name: ")
-    if name: break
+        print("that is not a valid event #")
 
 cursor.execute(f"SELECT * FROM mydb.event_types")
 event_types = cursor.fetchall()
@@ -94,15 +70,39 @@ for event_type in event_types:
     print(f"{event_type['idevent_types']}: {event_type['name']}")
 
 while True:
-    event = input("select event code: ").upper()
+    event = input("🌲 select event code: ").upper()
     if event in [event_type['idevent_types'].upper() for event_type in event_types]:
-        break
+        if event == "DBL" and len(sys.argv[1:]) != 2:
+            print("a double sprint event type needs two result spreadsheets for a successful import.")
+            print("aborting.")
+            sys.exit()
+        else:
+            break
     else:
         print("that is not a valid event type.")
 
+names = []
+while True:
+    if event == "DBL":
+        name = input("create name for first double sprint event: ")
+        if name:
+            names.append(name)
+            name = input("create name for second double sprint event: ")
+            if name:
+                if name == names[0]:
+                    print("the two double sprint event names have to be different.")
+                    continue
+                names.append(name)
+                break
+    else:
+        name = input("🆔 create event name: ")
+        if name: 
+            names.append(name)
+            break
+
 while True:
     try:
-        date = parse(input("enter event date: "))
+        date = parse(input("📅 enter event date: "))
         date = date.strftime("%Y-%m-%d")
         break
     except:
@@ -110,33 +110,6 @@ while True:
 
 clear()
 
-logging.info("adding event to record...")
-cursor.execute(f"INSERT INTO mydb.event VALUES {field_repr(season, number, name, date, event)}")
-
-event_grades = []
-logging.info("creating event grades...")
-with open(csv_path, "r") as csvfile:
-    reader = csv.DictReader(csvfile)
-    for row in reader:
-        if row["Short"] and row["Short"] not in event_grades:
-            event_grades.append(row["Short"])
-
-cursor.execute(f"SELECT * FROM mydb.grade WHERE season_idyear = {season}")
-grades = [row["idgrade"].upper() for row in cursor.fetchall()]
-
-for event_grade in event_grades:
-    if event_grade not in grades:
-        logging.warning(f"grade {event_grade} not in {season} OY season; omitting")
-        del event_grade
-for grade in grades:
-    if grade not in event_grades:
-        logging.info(f"{season} OY season grade {grade} not used in this event")
-
-for event_grade in event_grades:
-    cursor.execute(f"INSERT INTO mydb.event_grades VALUES {field_repr(event_grade, season, number)}")
-
-cursor.execute(f"SELECT * FROM mydb.member")
-members = [row["first_name"] + "%" + row["last_name"] for row in cursor.fetchall()]
 
 def get_details(member):
     first, last = member.split("%")
@@ -149,7 +122,22 @@ def get_member_name(member_id):
     a = cursor.fetchall()[0]
     return a["first_name"] + " " + a["last_name"]
 
-non_members = []
+def subset(*names):
+    names = [re.split(' |-|/', name) for name in names]
+    names.sort(key=lambda element: len(element)) # last name with less first
+    if len(names[0]) == len(names[1]):
+        for parts in zip(*names):
+            if textdistance.levenshtein(*parts) > 2:
+                return False
+        return True
+    else:
+        for part1 in names[0]:
+            for part2 in names[1]:
+                if textdistance.levenshtein(part1, part2) <= 2:
+                    return True
+        return False
+
+time_warnings = []
 
 def import_result(member_id, result):
     status = status_code[int(result["Classifier"])]
@@ -161,13 +149,13 @@ def import_result(member_id, result):
             time = [0] * (3 - len(time)) + time
             if time[0] > 10 and time[2] == 0:
                 time_repr = ':'.join([str(value).zfill(2) for value in time])
-                logging.warning(f"found bad time {time_repr}, correcting to 00:{':'.join([str(value).zfill(2) for value in time[0:2]])}")
+                time_warnings.append(f"⚠\uFE0F  importing bad time {time_repr} as 00:{':'.join([str(value).zfill(2) for value in time[0:2]])}")
                 time[0], time[1], time[2] = 0, time[0], time[1]
                 if time[0] > 24:
-                    logging.error(f"found bad time {time_repr}, skipping entry")
+                    time_warnings.append(f"⚠\uFE0F  not importing bad time {time_repr}")
                     time = None
         else:
-            logging.error(f"could not find time for member #{member_id} ({get_member_name(member_id)}) despite status being {status}. Importing anyway")
+            time_warnings.append(f"❌ could not find time for member #{member_id} ({get_member_name(member_id)}) despite status being {status}. Importing anyway")
             time = None
     else:
        time = None 
@@ -191,96 +179,181 @@ def import_result(member_id, result):
             None
         ))
 
-with open(csv_path, "r") as csvfile:
-    reader = csv.DictReader(csvfile)
-    for field in reader:
-        competitor_dob = field["YB"]
-        competitor_gender = field["S"]
-        competitor = field["First name"] + "%" + field["Surname"]
-        result = process.extract(competitor, members, limit=3, scorer=fuzz.token_sort_ratio)
-        competitor = competitor.replace("%", " ")
-        if result[0][1] == 100:
-            
-            if result[1][1] == 100:
-                logging.error(f"OMITTING:multiple members with name {competitor} found")
-            else:
-                member = result[0][0]
-                member_id, member_dob, member_gender = get_details(member)
-                member = member.replace("%", " ")
-                if competitor_dob and competitor_gender:
-                    if member_dob.year == int(competitor_dob) and member_gender == competitor_gender:
-                        import_result(member_id, field)
-                    else:
-                        if check_for_match_ignore(competitor, member):
-                            logging.warning(f"OMMITING:ignored match between {competitor} and {member} because of .matchignore file")
-                        else:
-                            logging.warning(f"ADDING:details of {competitor} do not match with the members database")
-                            import_result(member_id, field)
 
-                else:
-                    # logging.info(f"found competitor {competitor} but their gender or DOB is missing, ADDING")
+class Competitor():
+    def __init__(self, field) -> None:
+        self.first, self.last = field["First name"].lower(), field["Surname"].lower()
+        self.dob = field["YB"]
+        self.gender = field["S"]
+
+        self.member = None
+
+    def __repr__(self):
+        return f"{self.first} {self.last}"
+    
+    def find_closest_members(self, members):
+        self.closest_members = process.extract("%".join([self.first, self.last]), members, limit=3, scorer=fuzz.token_sort_ratio)
+        self.closest_members = [list(match) for match in self.closest_members]
+        for match in self.closest_members:
+            match.append({
+                "subset": False,
+                "denormalization": False
+            })
+
+class Member(Competitor):
+    def __init__(self, name) -> None:
+        super().__init__(name)
+
+event_grades = []
+print(" ℹ\uFE0F adding event to record...")
+for name, csv_path in zip(names, csv_paths):
+    cursor.execute(f"INSERT INTO mydb.event VALUES {field_repr(season, number, name, date, event)}")
+
+    print(" ℹ\uFE0F creating event grades...")
+    with open(csv_path, "r") as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            if row["Short"] and row["Short"] not in event_grades:
+                event_grades.append(row["Short"])
+
+    cursor.execute(f"SELECT * FROM mydb.grade WHERE season_idyear = {season}")
+    grades = [row["idgrade"].upper() for row in cursor.fetchall()]
+
+    for event_grade in event_grades:
+        if event_grade not in grades:
+            print(f"⚠\uFE0F  grade {event_grade} not in {season} OY season; omitting")
+            del event_grade
+    for grade in grades:
+        if grade not in event_grades:
+            print(f"⚠\uFE0F  {season} OY season grade {grade} not used in this event")
+
+    for event_grade in event_grades:
+        pass
+        cursor.execute(f"INSERT INTO mydb.event_grades VALUES {field_repr(event_grade, season, number)}")
+
+    cursor.execute(f"SELECT * FROM mydb.member")
+    members = [row["first_name"] + "%" + row["last_name"] for row in cursor.fetchall()]
+
+
+    competitors = []
+
+    print(" ℹ\uFE0F creating competitor-member relations...")
+    with open(csv_path, "r") as csvfile:
+        reader = csv.DictReader(csvfile)
+        for field in reader:
+            competitors.append(competitor := Competitor(field))
+            competitor.find_closest_members(members)
+
+            if len([result for result in competitor.closest_members if result == 100]) > 1:
+                print(f"🛑 multiple members with name {repr(competitor)} found")
+                sys.exit()
+            for member, score, tests in competitor.closest_members:
+
+                first, last = member.lower().split('%')
+                if score == 100:
+                    member_id, member_dob, member_gender = get_details(member)
                     import_result(member_id, field)
-                    pass
-        elif result[0][1] > 70:
-            for re in result:
-                member = re[0]
-                member_id, member_dob, member_gender = get_details(member)
-                member = member.replace("%", " ")
-                if competitor_dob:
-                    if member_dob.year == int(competitor_dob) and member_gender == competitor_gender:
-                        if re[1] >= 90:
-                            import_result(member_id, field)
-                        else:
-                            if check_for_match_ignore(competitor, member):
-                                logging.warning(f"OMMITING:ignored match between {competitor} and {member} because of .matchignore file")
-                            else:
-                                logging.warning(f"ADDING:match between {competitor} and {member} is not certain, but DOB and gender match")
-                                import_result(member_id, field) 
-                        break
+                    competitor.member = member
+                    break
+                elif score > 70:
+                    if competitor.last == last:
+                        tests["subset"] = "perfect"
                     else:
-                        logging.warning(f"OMITTING:match between {competitor} and {member} is likely but all details are different")
-                        break
-                else:
-                    if re[1] >= 79:
-                        if member_gender == competitor_gender:
-                            if check_for_match_ignore(competitor, member):
-                                logging.warning(f"OMMITING:ignored match between {competitor} and {member} because of .matchignore file")
-                            else:
-                                logging.warning(f"ADDING:match between {competitor} and {member} is not certain, but gender matches")
-                                import_result(member_id, field)
-                                break
+                        if subset(competitor.last, last):
+                            tests["subset"] = "passed"
                         else:
-                            logging.warning(f"OMITTING:match between {competitor} and {member} is likely but all details are different")
+                            tests["subset"] = "failed"
+                    if competitor.first == first:
+                        tests["denormalization"] = "perfect"
                     else:
-                        # logging.warning(f"OMMITING:match between  {competitor} and {member} is possible but unlikely")
-                        pass
-
-
-            else:
-                non_members.append(
-                    [competitor.ljust(25),
-                    f"{result[0][1]}%",
-                    f"{competitor_gender}",
-                    f"DOB:{competitor_dob}".ljust(9),
-                    f"c:{result[0][0].replace('%', ' ')}"])
+                        denormalizer = python_parser.NameDenormalizer("nickname_lookup/names.csv")
+                        try:
+                            if competitor.first in denormalizer[first]:
+                                tests["denormalization"] = "passed"
+                            else:
+                                tests["denormalization"] = "failed"
+                        except KeyError:      
+                            tests["denormalization"] = "noname"
                 
+                    if tests["subset"] in ["perfect", "passed"]:
+                        if  tests["denormalization"] in ["perfect", "passed"]:
+                            member_id, member_dob, member_gender = get_details(member)
+                            import_result(member_id, field)
+                            competitor.member = member
+                            break
+                    competitor.member = False
+
+
+    print(" ℹ\uFE0F done")
+    input(" ℹ\uFE0F press enter to continue to import overview: ")
+
+    clear()
+
+    print(f"🆔 {name}")
+    print(f"📅 {date}")
+    print(f"🌲 {event}")
+    print()
+
+    for warning in time_warnings:
+        print(warning)
+
+
+    print()
+    for competitor in competitors:
+        if competitor.member:
+            for member, score, tests in competitor.closest_members:
+                if member == competitor.member:
+                    if score != 100:
+                        print(f"⚠\uFE0F  importing '{repr(competitor)}' as ⭕ {member.replace('%', ' ')}:")
+                        for key, value in tests.items():
+                            if value == "passed":
+                                print(f"    ✅ passed {key.upper()} test")
         else:
-          non_members.append(
-            [competitor.ljust(25),
-            f"{result[0][1]}%",
-            f"{competitor_gender}",
-            f"DOB:{competitor_dob}".ljust(9)])
+            member, score, tests = competitor.closest_members[0]
+            if score >= 90:
+                print(f"⚠\uFE0F  not importing '{repr(competitor)}' (closest match: ⭕ {member.replace('%', ' ')}:")
+                for key, value in tests.items():
+                    if value == "failed":
+                        print(f"    ❌ failed {key.upper()} test")
+                    elif value == "passed":
+                        print(f"    ✅ passed {key.upper()} test")
+                    elif value == "noname":
+                        print(f"    📛 nonamed {key.upper()} test")
 
-non_members.sort(key=lambda x: x[1], reverse=True)
-logging.info(f"non-members omitted in this import:")
-print(*(' '.join(row) for row in non_members), sep='\n')
-print()
+    print()
+    print("⚠\uFE0F  list of possible matches:")
+    for competitor in competitors:
+        if not competitor.member:
+            member, score, tests = competitor.closest_members[0]
+            if score >= 70:
+                print ("   ", repr(competitor).ljust(25),
+                        f"{score}%",
+                        f"{competitor.gender}",
+                        f"{competitor.dob}".ljust(5),
+                        f"⭕ {member.replace('%', ' ')}")
+    
+    print()
+    print("⚠\uFE0F  full list of non-members after import:")
+    for competitor in competitors:
+        if not competitor.member:
+            member, score, tests = competitor.closest_members[0]
+            if score < 70:
+                print("    non-member:", repr(competitor).ljust(25))
 
-i = input("press enter to continue import: ")
-if i:
-    print("aborting...")
-    sys.exit()
+    print()
+    print("⚠\uFE0F  please review the changes before importing")
+    while True:
+        i = input(" ℹ\uFE0F type 'continue' to import this event: ")
+        if i:
+            if i == "continue":
+                break
+            else:
+                j = input("press enter to quit import ")
+                if not j:
+                    print("aborting...")
+                    sys.exit()
+                continue
 
-logging.info("importing results...")
+print(" ℹ\uFE0F importing results...")
 if commit: cnx.commit()
-logging.info("done!")
+print(" ℹ\uFE0F done")
