@@ -1,9 +1,12 @@
 from pick import pick
 from dateutil.parser import parse as dateparse
 from os import system
+import sys
+
+Null = object()
 
 class Prompt():
-    def __init__(self, name, validate=None, default=None) -> None:
+    def __init__(self, name, validate=None, default=Null) -> None:
         self.imperative = "Enter"
         self.name = name
         self.validate = validate
@@ -34,7 +37,7 @@ class Prompt():
                 response = input(self.title)
             try:
                 if not response: 
-                    if self.default:
+                    if self.default is not Null:
                         response = self.default
                     else:
                         raise ValueError
@@ -64,12 +67,15 @@ class List(Prompt):
         self.indicator = indicator
         self.default = default
 
-        super().__init__(name)
+        super().__init__(name, default=default)
     
     def prompt(self):
         index = 0
         if self.default:
             index = self.options.index(self.default)
+        if not self.options:
+            print("No entries could be found. Aborting...")
+            sys.exit()
         return pick(self.options, self.title, self.indicator, default_index=index)[0]
 
 
@@ -97,7 +103,15 @@ class Form():
         self.prompts = prompts
     
     def execute(self):
-        new = {}
-        for key, prompt in self.prompts.items():
-            new[key] = prompt.prompt()
-        return new
+        if type(self.prompts) is dict:
+            new = {}
+            for key, prompt in self.prompts.items():
+                new[key] = prompt.prompt()
+            return new
+        elif type(self.prompts) in [list, tuple]:
+            new = []
+            for prompt in self.prompts:
+                new.append(prompt.prompt())
+            return new
+        else:
+            return NotImplementedError
