@@ -4,8 +4,13 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+fuzzywuzzy = "*"
+mysql-connector-python = "*"
 
 [dev-packages]
+wemake-python-styleguide = "*"
+autopep8 = "*"
+mypy = "*"
 
 [requires]
 python_version = "3.9"
