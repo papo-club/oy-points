@@ -6,6 +6,7 @@ name = "pypi"
 [packages]
 fuzzywuzzy = "*"
 mysql-connector-python = "*"
+python-dateutil = "*"
 
 [dev-packages]
 wemake-python-styleguide = "*"
