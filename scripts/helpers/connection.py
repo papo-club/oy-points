@@ -18,6 +18,7 @@ for key in uri_args:
 
 connection = connector.connect(**uri_args)
 cursor = connection.cursor()
+cursor_dict = connection.cursor(dictionary=True)
 
 
 def commit_and_close() -> None:

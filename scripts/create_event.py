@@ -1,6 +1,5 @@
 import logging
-from os import path
-from sys import argv, stdin
+from sys import stdin
 
 from dateutil import parser
 from helpers.connection import commit_and_close, cursor
@@ -8,7 +7,6 @@ from helpers.connection import commit_and_close, cursor
 MAX_EVENTS = 10
 
 logging.basicConfig(level=logging.INFO, format="")
-csv_path = path.join(path.dirname(__file__), "..", argv[1])
 
 cursor.execute("SELECT year FROM oypoints.season")
 seasons = cursor.fetchall()

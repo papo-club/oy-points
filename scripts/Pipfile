@@ -7,10 +7,10 @@ name = "pypi"
 fuzzywuzzy = "*"
 mysql-connector-python = "*"
 python-dateutil = "*"
+pytimeparse = "*"
 
 [dev-packages]
 wemake-python-styleguide = "*"
-autopep8 = "*"
 mypy = "*"
 
 [requires]
