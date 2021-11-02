@@ -223,11 +223,23 @@ for member in cursor_dict.fetchall():
         ),
     )
 
-csv_timeformat = '%H:%M:%S'
+csv_timeformats = ["%H:%M:%S", "%M:%S"]
 
 with open(csv_path, "r") as csvfile:
     reader = DictReader(csvfile)
     for competitor_raw in reader:
+        deltatime = None
+        if competitor_raw["Time"]:
+            for timeformat in csv_timeformats:
+                try:
+                    deltatime = datetime.strptime(
+                        competitor_raw["Finish"], timeformat,
+                    ) - datetime.strptime(
+                        competitor_raw["Start"], timeformat,
+                    )
+                except ValueError:
+                    continue
+
         competitors.append(
             _Competitor(
                 first_name=competitor_raw["First name"],
@@ -239,13 +251,7 @@ with open(csv_path, "r") as csvfile:
                 ) if competitor_raw["YB"] else None,
                 gender=competitor_raw["S"],
                 grade=competitor_raw["Short"],
-                time=(
-                    datetime.strptime(
-                        competitor_raw["Finish"], csv_timeformat,
-                    ) - datetime.strptime(
-                        competitor_raw["Start"], csv_timeformat,
-                    )
-                ) if competitor_raw["Time"] else None,
+                time=deltatime,
             ),
         )
 
