@@ -1,12 +1,11 @@
 import logging
 from csv import DictReader
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from os import path
 from sys import argv, stdin
 from typing import Optional
 
 from fuzzywuzzy import fuzz, process  # type: ignore
-from pytimeparse.timeparse import timeparse  # type: ignore
 
 from helpers.connection import cursor_dict, commit_and_close
 
@@ -223,6 +222,9 @@ for member in cursor_dict.fetchall():
             memberid=member["idmember"],
         ),
     )
+
+csv_timeformat = '%H:%M:%S'
+
 with open(csv_path, "r") as csvfile:
     reader = DictReader(csvfile)
     for competitor_raw in reader:
@@ -237,8 +239,12 @@ with open(csv_path, "r") as csvfile:
                 ) if competitor_raw["YB"] else None,
                 gender=competitor_raw["S"],
                 grade=competitor_raw["Short"],
-                time=timedelta(
-                    timeparse(competitor_raw["Time"]),
+                time=(
+                    datetime.strptime(
+                        competitor_raw["Finish"], csv_timeformat,
+                    ) - datetime.strptime(
+                        competitor_raw["Start"], csv_timeformat,
+                    )
                 ) if competitor_raw["Time"] else None,
             ),
         )
