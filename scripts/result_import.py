@@ -2,6 +2,7 @@ import logging
 from csv import DictReader
 from datetime import date, timedelta, datetime
 from os import path
+import re
 from sys import argv, stdin
 from typing import Optional
 
@@ -86,7 +87,7 @@ def _get_member_from_match(
         match: _Match,
 ) -> _Person:
     for member in members_list:
-        if member.full_name() == match.name:
+        if _normalize_name(member.full_name()) == match.name:
             return member
     raise ValueError
 
@@ -104,7 +105,7 @@ def _commit_member(member: _Member, competitor: _Competitor) -> None:
          ))
 
 
-def _find_possible_match() -> None:
+def _find_possible_match(matches) -> None:
     for match in matches:
         member = _get_member_from_match(members, match)
         gender_matches = member.gender == competitor.gender
@@ -156,7 +157,7 @@ def _find_possible_match() -> None:
                 )
 
 
-def _certain_match() -> None:
+def _certain_match(top_match) -> None:
     member = _get_member_from_match(members, top_match)
 
     gender_matches = member.gender == competitor.gender
@@ -256,36 +257,64 @@ with open(csv_path, "r") as csvfile:
         )
 
 
-for competitor in competitors:
+def _normalize_name(name: str) -> str:
+    return re.sub("\s|-|_", "", name.lower())
+
+
+def _get_matches(competitor, members) -> None:
     matches_temp = process.extract(
-        competitor.full_name(),
-        [member.full_name() for member in members],
+        _normalize_name(competitor),
+        [_normalize_name(member.full_name()) for member in members],
         limit=3,
         scorer=fuzz.token_sort_ratio,
     )
     matches = []
     for match in matches_temp:
         matches.append(_Match(name=match[0], score=match[1]))
-    top_match = matches[0]
-
+    top_match = matches[0] 
+    
     if len(list(filter(lambda match: match.is_certain(), matches))) > 1:
         logging.warning(
             f"OMIT:multiple members with name {competitor} found",
         )
-
     elif top_match.is_certain():
-        _certain_match()
+        _certain_match(top_match)
     elif top_match.is_possible():
-        _find_possible_match()
+        _find_possible_match(matches)
     else:
         non_members.append(competitor)
         logging.info(
             f"OMIT: no membership found for competitor {competitor}",
         )
 
+
+for competitor in competitors:
+    # competitor_names = competitor.full_name().split(" ")
+    # # member_names = member.full_name().split(" ")
+
+    # if len(competitor_names) > 2:
+    #     _get_matches(f"{competitor_names[0]} {competitor_names[1]}", members)
+    #     _get_matches(f"{competitor_names[0]} {competitor_names[2]}", members)
+    #     _get_matches(f"{competitor_names[1]} {competitor_names[2]}", members)
+    # # if member_names > 2 and competitor_names == 2:
+    # #     names = competitor.full_name().split(" ")
+    # #     _get_matches(f"{member_names[0]} {member_names[1]}")
+    # #     _get_matches(f"{member_names[0]} {member_names[2]}")
+    # #     _get_matches(f"{member_names[1]} {member_names[2]}")
+    # else:
+    _get_matches(competitor.full_name(), members)
+
+
+
 logging.info("competitors matched in this import:")
 logging.info(", ".join(
-    [non_member.full_name() for non_member in non_members],
+    [non_member for non_member in non_members],
 ))
 
-commit_and_close()
+logging.critical("continue with import?")
+answer = stdin.readline().strip()
+if answer.lower() in ("y", "yes"):
+    commit_and_close()
+    logging.critical("import complete")
+else:
+    logging.critical("import aborted")
