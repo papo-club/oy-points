@@ -192,7 +192,7 @@ app.get("/points", (req, res) => {
                       },
                       0
                     );
-                    points[grade][id].totalPoints = totalPoints;
+                    points[grade][id].totalPoints = +totalPoints.toFixed(2);
                   })
                 );
               })
@@ -203,5 +203,5 @@ app.get("/points", (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Example app listening at http://localhost:${port}`);
+  console.log(`App listening at http://localhost:${port}`);
 });
