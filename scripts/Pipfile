@@ -15,3 +15,9 @@ mypy = "*"
 
 [requires]
 python_version = "3.9"
+
+[scripts]
+points = "python src/calculate_points.py"
+event = "python src/create_event.py"
+members = "python src/member_import.py"
+results = "python src/result_import.py"
