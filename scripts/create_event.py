@@ -2,16 +2,16 @@ import logging
 from sys import stdin
 
 from dateutil import parser
-from helpers.connection import commit_and_close, cursor
+from helpers.connection import commit_and_close, cursor_dict
 
 MAX_EVENTS = 10
 
 logging.basicConfig(level=logging.INFO, format="")
 
-cursor.execute("SELECT year FROM oypoints.season")
-seasons = cursor.fetchall()
-cursor.execute("SELECT * FROM oypoints.discipline")
-disciplines = cursor.fetchall()
+cursor_dict.execute("SELECT year FROM oypoints.season")
+seasons = cursor_dict.fetchall()
+cursor_dict.execute("SELECT * FROM oypoints.discipline")
+disciplines = cursor_dict.fetchall()
 
 logging.info("available seasons:")
 for season in seasons:
@@ -66,7 +66,7 @@ while True:
         break
 
 logging.info("adding event to record...")
-cursor.execute(
+cursor_dict.execute(
     "REPLACE INTO oypoints.event "
     "VALUES (%s, %s, %s, %s, %s)",
     [season, number, name, date, event_disc],
