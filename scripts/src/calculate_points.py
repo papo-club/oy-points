@@ -1,6 +1,5 @@
 import logging
 from datetime import timedelta
-from math import floor
 from sys import stdin
 
 from helpers.connection import commit_and_close, cursor, cursor_dict
@@ -61,7 +60,10 @@ for event in events:
         for race_result in race_results:
             if race_result["time"]:
                 points = max(
-                    floor(MAX_POINTS * (winner["time"] / race_result["time"])),
+                    round(
+                        MAX_POINTS * (winner["time"] / race_result["time"]),
+                        2,
+                    ),
                     MIN_POINTS,
                 )
             else:
