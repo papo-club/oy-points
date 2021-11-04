@@ -3,7 +3,7 @@ import sys
 from csv import DictReader
 from os import path
 
-from helpers.connection import commit_and_close, cursor
+from helpers.connection import commit_and_close, cursor_dict
 
 logging.basicConfig(level=logging.INFO, format="")
 csv_path = path.join(path.dirname(__file__), "..", sys.argv[1])
@@ -26,7 +26,7 @@ with open(csv_path, "r") as members_csv:
                      )
 
         keys = ",".join(fieldname_mapper.keys())
-        cursor.execute(
+        cursor_dict.execute(
             "REPLACE INTO oypoints.member "
             f"({keys}) VALUES (%s, %s, %s, %s, %s)",
             row_data,

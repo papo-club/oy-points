@@ -2,3 +2,4 @@
 *.csv
 .env
 sample-data
+node_modules

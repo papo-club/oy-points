@@ -1,0 +1,18 @@
+{
+  "name": "oy-points",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "api": "cd api && npm start",
+    "client": "cd client && npm start",
+    "start": "npm run api & npm run client"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ryan-mooore/oypoints.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ryan-mooore/oypoints/issues"
+  },
+  "homepage": "https://github.com/ryan-mooore/oypoints#readme"
+}
