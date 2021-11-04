@@ -1,14 +1,13 @@
 import logging
-from csv import DictReader
-from datetime import date, timedelta, datetime
-from os import path
 import re
+from csv import DictReader
+from datetime import date, datetime, timedelta
+from os import path
 from sys import argv, stdin
 from typing import Optional
 
 from fuzzywuzzy import fuzz, process  # type: ignore
-
-from helpers.connection import cursor_dict, commit_and_close
+from helpers.connection import commit_and_close, cursor_dict
 
 logging.basicConfig(level=logging.WARNING, format="")
 csv_path = path.join(path.dirname(__file__), "..", argv[1])
@@ -85,7 +84,7 @@ class _Member(_Person):
 def _get_member_from_match(
         members_list: list[_Member],
         match: _Match,
-) -> _Person:
+) -> _Member:
     for member in members_list:
         if _normalize_name(member.full_name()) == match.name:
             return member
@@ -94,18 +93,20 @@ def _get_member_from_match(
 
 def _commit_member(member: _Member, competitor: _Competitor) -> None:
     cursor_dict.execute(
-        ("REPLACE INTO oypoints.result "
-         "VALUES (%s, %s, %s, %s, %s, %s)"),
-        (member.memberid,
-         competitor.time,
-         selected_event["season_idyear"],
-         selected_event["number"],
-         competitor.grade,
-         selected_event["season_idyear"],
-         ))
+        "REPLACE INTO oypoints.result "
+        "VALUES (%s, %s, %s, %s, %s, %s)",
+        (
+            member.memberid,
+            competitor.time,
+            selected_event["season_idyear"],
+            selected_event["number"],
+            competitor.grade,
+            selected_event["season_idyear"],
+        ),
+    )
 
 
-def _find_possible_match(matches) -> None:
+def _find_possible_match(matches: list[_Match]) -> None:
     for match in matches:
         member = _get_member_from_match(members, match)
         gender_matches = member.gender == competitor.gender
@@ -157,7 +158,7 @@ def _find_possible_match(matches) -> None:
                 )
 
 
-def _certain_match(top_match) -> None:
+def _certain_match(top_match: _Match) -> None:
     member = _get_member_from_match(members, top_match)
 
     gender_matches = member.gender == competitor.gender
@@ -179,6 +180,34 @@ def _certain_match(top_match) -> None:
         _commit_member(member, competitor)
 
 
+def _get_matches(competitor: _Competitor, members: list[_Member]) -> None:
+    matches_temp = process.extract(
+        _normalize_name(competitor.full_name()),
+        [_normalize_name(member.full_name()) for member in members],
+        limit=3,
+        scorer=fuzz.token_sort_ratio,
+    )
+    matches = []
+    for match in matches_temp:
+        matches.append(_Match(name=match[0], score=match[1]))
+    top_match = matches[0]
+
+    if len(list(filter(lambda match: match.is_certain(), matches))) > 1:
+        logging.warning(
+            f"OMIT:multiple members with name {competitor.full_name()} found",
+        )
+    elif top_match.is_certain():
+        _certain_match(top_match)
+    elif top_match.is_possible():
+        _find_possible_match(matches)
+    else:
+        non_members.append(competitor)
+        logging.info(
+            "OMIT: no membership found for competitor"
+            f"{competitor.full_name()}",
+        )
+
+
 cursor_dict.execute("SELECT * FROM oypoints.event")
 events = cursor_dict.fetchall()
 
@@ -192,7 +221,7 @@ for event in events:
         f"OY{event['number']}: {event['name']}",
     )
 
-selected_event = None
+selected_event = event[0]
 while True:
     logging.critical("event code?")
     event_code = stdin.readline().strip()
@@ -211,7 +240,7 @@ while True:
 cursor_dict.execute("SELECT * FROM oypoints.member")
 members = []
 competitors = []
-non_members = []
+non_members: list[_Competitor] = []
 
 for member in cursor_dict.fetchall():
     members.append(
@@ -258,62 +287,21 @@ with open(csv_path, "r") as csvfile:
 
 
 def _normalize_name(name: str) -> str:
-    return re.sub("\s|-|_", "", name.lower())
-
-
-def _get_matches(competitor, members) -> None:
-    matches_temp = process.extract(
-        _normalize_name(competitor),
-        [_normalize_name(member.full_name()) for member in members],
-        limit=3,
-        scorer=fuzz.token_sort_ratio,
-    )
-    matches = []
-    for match in matches_temp:
-        matches.append(_Match(name=match[0], score=match[1]))
-    top_match = matches[0] 
-    
-    if len(list(filter(lambda match: match.is_certain(), matches))) > 1:
-        logging.warning(
-            f"OMIT:multiple members with name {competitor} found",
-        )
-    elif top_match.is_certain():
-        _certain_match(top_match)
-    elif top_match.is_possible():
-        _find_possible_match(matches)
-    else:
-        non_members.append(competitor)
-        logging.info(
-            f"OMIT: no membership found for competitor {competitor}",
-        )
+    return re.sub(r"\s|-|_", "", name.lower())
 
 
 for competitor in competitors:
-    # competitor_names = competitor.full_name().split(" ")
-    # # member_names = member.full_name().split(" ")
-
-    # if len(competitor_names) > 2:
-    #     _get_matches(f"{competitor_names[0]} {competitor_names[1]}", members)
-    #     _get_matches(f"{competitor_names[0]} {competitor_names[2]}", members)
-    #     _get_matches(f"{competitor_names[1]} {competitor_names[2]}", members)
-    # # if member_names > 2 and competitor_names == 2:
-    # #     names = competitor.full_name().split(" ")
-    # #     _get_matches(f"{member_names[0]} {member_names[1]}")
-    # #     _get_matches(f"{member_names[0]} {member_names[2]}")
-    # #     _get_matches(f"{member_names[1]} {member_names[2]}")
-    # else:
-    _get_matches(competitor.full_name(), members)
-
+    _get_matches(competitor, members)
 
 
 logging.info("competitors matched in this import:")
 logging.info(", ".join(
-    [non_member for non_member in non_members],
+    [non_member.full_name() for non_member in non_members],
 ))
 
 logging.critical("continue with import?")
 answer = stdin.readline().strip()
-if answer.lower() in ("y", "yes"):
+if answer.lower() in {"y", "yes"}:
     commit_and_close()
     logging.critical("import complete")
 else:

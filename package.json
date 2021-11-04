@@ -5,7 +5,8 @@
   "scripts": {
     "api": "cd api && npm start",
     "client": "cd client && npm start",
-    "start": "npm run api & npm run client"
+    "script": "cd scripts && pipenv run --",
+    "web": "npm run api & npm run client"
   },
   "repository": {
     "type": "git",
