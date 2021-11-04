@@ -8,6 +8,7 @@ fuzzywuzzy = "*"
 mysql-connector-python = "*"
 python-dateutil = "*"
 pytimeparse = "*"
+python-levenshtein = "*"
 
 [dev-packages]
 wemake-python-styleguide = "*"
