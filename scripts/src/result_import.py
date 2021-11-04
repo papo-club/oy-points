@@ -10,7 +10,7 @@ from fuzzywuzzy import fuzz, process  # type: ignore
 from helpers.connection import commit_and_close, cursor_dict
 
 logging.basicConfig(level=logging.WARNING, format="")
-csv_path = path.join(path.dirname(__file__), "..", argv[1])
+csv_path = path.join(path.dirname(__file__), "../..", argv[1])
 
 
 LIKELY_MATCH = 0.9
@@ -221,7 +221,7 @@ for event in events:
         f"OY{event['number']}: {event['name']}",
     )
 
-selected_event = event[0]
+selected_event = event
 while True:
     logging.critical("event code?")
     event_code = stdin.readline().strip()

@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "dc017876663b867ee37bed5b9c345b15d90d144d58592f107b831bcccb6f5051"
+            "sha256": "d694df9f7941e02eb530d6515038c10f7e95f60411d158ea3fa49acf173ef891"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -100,6 +100,13 @@
             ],
             "index": "pypi",
             "version": "==2.8.2"
+        },
+        "python-levenshtein": {
+            "hashes": [
+                "sha256:dc2395fbd148a1ab31090dd113c366695934b9e85fe5a4b2a032745efd0346f6"
+            ],
+            "index": "pypi",
+            "version": "==0.12.2"
         },
         "pytimeparse": {
             "hashes": [
@@ -285,11 +292,11 @@
         },
         "isort": {
             "hashes": [
-                "sha256:9c2ea1e62d871267b78307fe511c0838ba0da28698c5732d54e2790bf3ba9899",
-                "sha256:e17d6e2b81095c9db0a03a8025a957f334d6ea30b26f9ec70805411e5c7c81f2"
+                "sha256:1a18ccace2ed8910bd9458b74a3ecbafd7b2f581301b0ab65cfdd4338272d76f",
+                "sha256:e52ff6d38012b131628cf0f26c51e7bd3a7c81592eefe3ac71411e692f1b9345"
             ],
             "markers": "python_version < '4.0' and python_full_version >= '3.6.1'",
-            "version": "==5.9.3"
+            "version": "==5.10.0"
         },
         "mccabe": {
             "hashes": [

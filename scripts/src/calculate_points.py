@@ -46,15 +46,17 @@ def _timesort(row: dict) -> timedelta:
 for event in events:
     for grade in grades:
         cursor_dict.execute(
-            "SELECT member_idmember, time"
-            "FROM oypoints.result"
-            "WHERE event_season_idyear=%s"
-            "AND event_number=%s"
+            "SELECT member_idmember, time "
+            "FROM oypoints.result "
+            "WHERE event_season_idyear=%s "
+            "AND event_number=%s "
             "AND grade_idgrade=%s",
             [season, event["number"], grade[0]],
         )
         race_results = cursor_dict.fetchall()
         race_results.sort(key=_timesort)
+        if not race_results:
+            continue
         winner = race_results[0]
         for race_result in race_results:
             if race_result["time"]:
