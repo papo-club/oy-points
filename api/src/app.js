@@ -15,6 +15,8 @@ var connection = mysql.createConnection({
 
 connection.connect();
 
+const MIN_EVENTS_TO_QUALIFY = 4;
+
 const getMembers = () => {
   return new Promise((resolve, reject) => {
     connection.query("SELECT * from oypoints.member", (err, rows, fields) => {
@@ -185,14 +187,42 @@ app.get("/points", (req, res) => {
             )
               .then(() => {
                 Object.entries(points).map(([grade, members]) =>
-                  Object.entries(members).map(([id, member]) => {
-                    totalPoints = Object.entries(member.results).reduce(
-                      (acc, [id, _event]) => {
-                        return (acc += _event.points);
+                  Object.entries(members).map(([idmember, member]) => {
+                    const allPoints = Object.values(member.results)
+                      .map((_event) => _event.points)
+                      .sort();
+                    points[grade][idmember].qualified = true;
+                    const totalPoints = Object.entries(member.results).reduce(
+                      (acc, [idevent, _event]) => {
+                        if (
+                          Object.keys(points[grade][idmember].results).length <
+                          MIN_EVENTS_TO_QUALIFY
+                        ) {
+                          points[grade][idmember].results[
+                            idevent
+                          ].qualified = false;
+                          points[grade][idmember].qualified = false;
+                          return acc + _event.points;
+                        } else if (
+                          allPoints.indexOf(_event.points) <
+                          Object.keys(points[grade][idmember].results).length -
+                            MIN_EVENTS_TO_QUALIFY
+                        ) {
+                          points[grade][idmember].results[
+                            idevent
+                          ].qualified = false;
+                          return acc;
+                        } else {
+                          points[grade][idmember].results[
+                            idevent
+                          ].qualified = true;
+                          return acc + _event.points;
+                        }
                       },
                       0
                     );
-                    points[grade][id].totalPoints = +totalPoints.toFixed(2);
+                    points[grade][idmember].totalPoints =
+                      +totalPoints.toFixed(2);
                   })
                 );
               })

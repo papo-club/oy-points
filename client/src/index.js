@@ -45,16 +45,46 @@ function App() {
                     (
                       [idcompetitora, competitora],
                       [idcompetitorb, competitorb]
-                    ) => competitorb.totalPoints - competitora.totalPoints
+                    ) =>
+                      competitorb.qualified - competitora.qualified ||
+                      competitorb.totalPoints - competitora.totalPoints
                   )
                   .map(([idcompetitor, competitor], index) => (
                     <tr>
-                      <th className="table-active">{index + 1}</th>
-                      <th className="table-active">{`${competitor.firstName} ${competitor.lastName}`}</th>
+                      <th
+                        className={`table-active ${
+                          competitor.qualified
+                            ? "fw-bold"
+                            : "text-muted fst-italic"
+                        }`}
+                      >
+                        {competitor.qualified ? index + 1 : 0}
+                      </th>
+                      <th
+                        className={`table-active ${
+                          competitor.qualified || "text-muted"
+                        }`}
+                      >{`${competitor.firstName} ${competitor.lastName}`}</th>
                       {Object.entries(events).map(([idevent, event_]) => (
-                        <td>{competitor.results[idevent]?.points}</td>
+                        <td
+                          className={
+                            competitor.results[idevent]?.qualified
+                              ? "fw-bold"
+                              : "text-muted fst-italic"
+                          }
+                        >
+                          {competitor.results[idevent]?.points}
+                        </td>
                       ))}
-                      <td>{competitor.totalPoints}</td>
+                      <td
+                        className={`table-active ${
+                          competitor.qualified
+                            ? "fw-bold"
+                            : "text-muted fst-italic"
+                        }`}
+                      >
+                        {competitor.totalPoints}
+                      </td>
                     </tr>
                   ))}
               </tbody>
