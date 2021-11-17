@@ -1,6 +1,11 @@
 import logging
 from datetime import timedelta
 from sys import stdin
+from enum import Enum
+from collections import Counter
+from functools import reduce
+from datetime import timedelta
+from typing import Match
 
 from helpers.connection import commit_and_close, cursor, cursor_dict
 
@@ -32,52 +37,146 @@ cursor_dict.execute(
 )
 events = cursor_dict.fetchall()
 cursor.execute(
-    "SELECT idgrade from oypoints.grade WHERE season_idyear=%s",
-    [season],
+    "SELECT idgrade from oypoints.grade",
 )
 grades = cursor.fetchall()
 
 
 def _timesort(row: dict) -> timedelta:
-    return row["time"] or timedelta(1, 0, 0)
+    return row["time"] if row["status"] == "OK" else timedelta(1, 0, 0)
 
 
+def _get_grade(competitor):
+    cursor.execute(
+        "SELECT grade_idgrade from oypoints.member_grade WHERE member_idmember=%s",
+        [competitor],
+    )
+    return cursor.fetchall()[0]
+
+
+class Derivation(Enum):
+    CTRL = "Controller"
+    DNF = "Did not finish"
+    DNS = "Did not start"
+    MP = "Mispunched"
+    NA = "Did not compete"
+    OK = "Competed"
+    PLAN = "Planner"
+    WG = "Wrong grade"
+    WIN = "Winner"
+
+
+cursor.execute("SELECT idgrade from oypoints.grade")
+grades = cursor.fetchall()
+
+cursor.execute("DELETE FROM oypoints.points")
 for event in events:
+    cursor.execute(
+        "SELECT number from oypoints.race WHERE event_season_idyear=%s AND event_number=%s", [
+            season, event["number"]])
+    races = [race[0] for race in cursor.fetchall()]
+    # calculate winning time
+    winning_times = {}
     for grade in grades:
         cursor_dict.execute(
-            "SELECT member_idmember, time "
-            "FROM oypoints.result "
-            "WHERE event_season_idyear=%s "
-            "AND event_number=%s "
-            "AND grade_idgrade=%s",
-            [season, event["number"], grade[0]],
-        )
+            "SELECT member_idmember, race_grade_race_number, race_grade_grade_idgrade, time FROM oypoints.result "
+            "WHERE race_grade_race_event_season_idyear=%s "
+            "AND race_grade_race_event_number=%s "
+            "AND race_grade_grade_idgrade=%s"
+            "AND status='OK'", [
+                season, event["number"], grade[0]])
         race_results = cursor_dict.fetchall()
-        race_results.sort(key=_timesort)
-        if not race_results:
-            continue
-        winner = race_results[0]
-        for race_result in race_results:
-            if race_result["time"]:
-                points = max(
-                    round(
-                        MAX_POINTS * (winner["time"] / race_result["time"]),
-                        2,
-                    ),
-                    MIN_POINTS,
-                )
+
+        members_in_event = Counter(
+            [result["member_idmember"] for result in race_results])
+        valid_members = [
+            member for member,
+            member_races in members_in_event.items() if member_races == len(races)]
+        best_time = timedelta(1, 0, 0)
+        for valid_member in valid_members:
+            member_race_results = [
+                result for result in race_results if result["member_idmember"] == valid_member]
+            time = sum([result["time"]
+                       for result in member_race_results], timedelta(0, 0, 0))
+            if time < best_time:
+                best_time = time
+        winning_times[grade[0]] = best_time
+
+    # get all results
+    cursor_dict.execute(
+        "SELECT member_idmember, race_grade_race_number, race_grade_grade_idgrade, time, status "
+        "FROM oypoints.result "
+        "WHERE race_grade_race_event_season_idyear=%s "
+        "AND race_grade_race_event_number=%s ", [
+            season, event["number"]], )
+    results = cursor_dict.fetchall()
+    competing_members = {*[result["member_idmember"] for result in results]}
+    for member in competing_members:
+
+        # get all results for member
+        cursor_dict.execute(
+            "SELECT race_grade_race_number, race_grade_grade_idgrade, time, status FROM oypoints.result "
+            "WHERE race_grade_race_event_season_idyear=%s "
+            "AND race_grade_race_event_number=%s "
+            "AND member_idmember=%s", [
+                season, event["number"], member],)
+        member_results = cursor_dict.fetchall()
+        if len(member_results) < len(races):
+            derivation = Derivation.NA  # both races not attempted
+            points = None
+        elif False in [result["race_grade_grade_idgrade"] == _get_grade(member)[0] for result in member_results]:
+            derivation = Derivation.WG  # wrong grade in an event
+            points = MIN_POINTS
+        elif True in [result["status"] ==
+                      "DNS" for result in member_results]:
+            derivation = Derivation.DNS  # dns in an event
+            points = False
+        elif False in [result["status"] ==  # non ok-status in an event
+                       "OK" for result in member_results]:
+            for result in member_results:
+                if result["status"] != "OK":
+                    derivation = getattr(Derivation, result["status"])
+                    points = MIN_POINTS
+        else:  # all good :)
+            time = sum([result["time"]
+                       for result in member_results], timedelta(0, 0, 0))
+
+            points = max(
+                round(
+                    MAX_POINTS *
+                    (winning_times[_get_grade(member)[0]] / time),
+                    2,
+                ),
+                MIN_POINTS,
+            )
+            if points == MAX_POINTS:
+                derivation = Derivation.WIN
             else:
-                points = MIN_POINTS
+                derivation = Derivation.OK
+
+        cursor.execute("REPLACE INTO oypoints.points VALUES (%s, %s, %s, %s, %s, %s)", [
+            season, member, season, event["number"],
+            points, derivation.name])
+
+    cursor_dict.execute(
+        "SELECT member_idmember, admin_roles_idadmin_roles FROM oypoints.event_admins WHERE event_season_idyear=%s AND event_number=%s", [
+            season, event["number"]])
+    admins = cursor_dict.fetchall()
+    for admin in admins:
+        cursor.execute(
+            "SELECT * from oypoints.member_grade WHERE member_idmember=%s", [admin["member_idmember"]])
+        if len(cursor.fetchall()
+               ):  # need to test whether admin has competed in oy year yet
+            # if they have not then cannot assign grade, not in competition
             cursor.execute(
                 "REPLACE INTO oypoints.points VALUES (%s, %s, %s, %s, %s, %s)",
                 [
-                    points,
-                    race_result["member_idmember"],
+                    season,
+                    admin["member_idmember"],
                     season,
                     event["number"],
-                    grade[0],
-                    season,
-                ],
-            )
+                    MAX_POINTS,
+                    admin["admin_roles_idadmin_roles"]])
+
 
 commit_and_close()
