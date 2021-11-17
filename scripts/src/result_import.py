@@ -60,11 +60,13 @@ class _Competitor(_Person):
             gender: str,
             grade: str,
             time: Optional[timedelta],
+            status: str
     ) -> None:
         super().__init__(first_name, last_name, gender)
         self.dob = dob if dob else None
         self.grade = grade
         self.time = time
+        self.status = status
 
 
 class _Member(_Person):
@@ -94,14 +96,15 @@ def _get_member_from_match(
 def _commit_member(member: _Member, competitor: _Competitor) -> None:
     cursor_dict.execute(
         "REPLACE INTO oypoints.result "
-        "VALUES (%s, %s, %s, %s, %s, %s)",
+        "VALUES (%s, %s, %s, %s, %s, %s, %s)",
         (
             member.memberid,
-            competitor.time,
             selected_event["season_idyear"],
             selected_event["number"],
+            race_num,
             competitor.grade,
-            selected_event["season_idyear"],
+            competitor.time,
+            competitor.status,
         ),
     )
 
@@ -218,7 +221,7 @@ for event in events:
     logging.critical(
         f"[{year}{number:02}] "
         f"{event['season_idyear']} "
-        f"OY{event['number']}: {event['name']}",
+        f"OY{event['number']}",
     )
 
 selected_event = event
@@ -236,6 +239,23 @@ while True:
         logging.critical("that is not a valid event code.")
         continue
     break
+
+cursor_dict.execute(
+    f"SELECT * FROM oypoints.race WHERE event_season_idyear={year} AND event_number={selected_event['number']}")
+races = cursor_dict.fetchall()
+
+for race in races:
+    logging.critical(f'{race["number"]}: {race["map"]}')
+while True:
+    logging.critical("Race in event?")
+    try:
+        race_num = int(stdin.readline().strip())
+    except BaseException:
+        logging.critical("Not a valid race number.")
+        continue
+    if race_num in [race["number"] for race in races]:
+        break
+
 
 cursor_dict.execute("SELECT * FROM oypoints.member")
 members = []
@@ -255,20 +275,66 @@ for member in cursor_dict.fetchall():
 
 csv_timeformats = ["%H:%M:%S", "%M:%S"]
 
+status_codes = {
+    0: "OK",
+    1: "DNS",
+    2: "DNF",
+    3: "MP",
+    4: "DQ"}
+
+cursor_dict.execute("SELECT * FROM oypoints.grade")
+grades = cursor_dict.fetchall()
+
+with open(csv_path, "r") as csvfile:
+    reader = DictReader(csvfile)
+
+    race_grades = {*[row["Long"] for row in reader]}
+    for race_grade in race_grades:
+        if selected_grade := next(
+            (grade for grade in grades if grade["name"] == race_grade),
+                None):
+            selected_grade = selected_grade["idgrade"]
+
+        else:
+            logging.critical("Available grades:")
+            for grade in grades:
+                logging.critical(f"{grade['idgrade']}: {grade['name']}")
+            while True:
+                logging.critical(f"Match grade for {race_grade}?")
+                selected_grade = stdin.readline().strip()
+                if selected_grade in grades:
+                    break
+                else:
+                    logging.critical("That is not a valid grade.")
+        cursor_dict.execute("REPLACE INTO oypoints.race_grade "
+                            "VALUES (%s, %s, %s, %s, %s)",
+                            [selected_event["season_idyear"],
+                                selected_event["number"],
+                                race_num,
+                                selected_grade["idgrade"],
+                                race_grade])
+
+
 with open(csv_path, "r") as csvfile:
     reader = DictReader(csvfile)
     for competitor_raw in reader:
         deltatime = None
         if competitor_raw["Time"]:
+            finish_time = None
+            start_time = None
             for timeformat in csv_timeformats:
                 try:
-                    deltatime = datetime.strptime(
-                        competitor_raw["Finish"], timeformat,
-                    ) - datetime.strptime(
-                        competitor_raw["Start"], timeformat,
-                    )
+                    finish_time = datetime.strptime(
+                        competitor_raw["Finish"], timeformat)
                 except ValueError:
-                    continue
+                    pass
+                try:
+                    start_time = datetime.strptime(
+                        competitor_raw["Start"], timeformat)
+                except ValueError:
+                    pass
+            if finish_time and start_time:
+                deltatime = finish_time - start_time
 
         competitors.append(
             _Competitor(
@@ -282,6 +348,9 @@ with open(csv_path, "r") as csvfile:
                 gender=competitor_raw["S"],
                 grade=competitor_raw["Short"],
                 time=deltatime,
+                status=status_codes[int(
+                    competitor_raw["Classifier"])
+                ]
             ),
         )
 
