@@ -54,6 +54,21 @@ def _get_grade(competitor):
     return cursor.fetchall()[0]
 
 
+def _correct_grade(member, result):
+    cursor.execute("SELECT grade_idgrade from oypoints.race_grade WHERE "
+                   "race_event_season_idyear=%s AND "
+                   "race_event_number=%s AND "
+                   "race_number=%s AND "
+                   "race_grade=%s",
+                   [season,
+                    result["race_event_number"],
+                    result["race_number"],
+                    result["race_grade_race_grade"]])
+    valid_grades = [grade[0] for grade in cursor.fetchall()]
+    competitor_grade = _get_grade(member)[0]
+    return competitor_grade in valid_grades
+
+
 class Derivation(Enum):
     CTRL = "Controller"
     DNF = "Did not finish"
@@ -79,10 +94,10 @@ for event in events:
     winning_times = {}
     for grade in grades:
         cursor_dict.execute(
-            "SELECT member_idmember, race_grade_race_number, race_grade_grade_idgrade, time FROM oypoints.result "
-            "WHERE race_grade_race_event_season_idyear=%s "
-            "AND race_grade_race_event_number=%s "
-            "AND race_grade_grade_idgrade=%s"
+            "SELECT member_idmember, race_number, race_grade_race_grade, time FROM oypoints.result "
+            "WHERE race_event_season_idyear=%s "
+            "AND race_event_number=%s "
+            "AND race_grade_race_grade=%s"
             "AND status='OK'", [
                 season, event["number"], grade[0]])
         race_results = cursor_dict.fetchall()
@@ -104,10 +119,10 @@ for event in events:
 
     # get all results
     cursor_dict.execute(
-        "SELECT member_idmember, race_grade_race_number, race_grade_grade_idgrade, time, status "
+        "SELECT member_idmember, race_number, race_grade_race_grade, time, status "
         "FROM oypoints.result "
-        "WHERE race_grade_race_event_season_idyear=%s "
-        "AND race_grade_race_event_number=%s ", [
+        "WHERE race_event_season_idyear=%s "
+        "AND race_event_number=%s ", [
             season, event["number"]], )
     results = cursor_dict.fetchall()
     competing_members = {*[result["member_idmember"] for result in results]}
@@ -115,16 +130,16 @@ for event in events:
 
         # get all results for member
         cursor_dict.execute(
-            "SELECT race_grade_race_number, race_grade_grade_idgrade, time, status FROM oypoints.result "
-            "WHERE race_grade_race_event_season_idyear=%s "
-            "AND race_grade_race_event_number=%s "
+            "SELECT race_event_number, race_number, race_grade_race_grade, time, status FROM oypoints.result "
+            "WHERE race_event_season_idyear=%s "
+            "AND race_event_number=%s "
             "AND member_idmember=%s", [
                 season, event["number"], member],)
         member_results = cursor_dict.fetchall()
         if len(member_results) < len(races):
             derivation = Derivation.NA  # both races not attempted
             points = None
-        elif False in [result["race_grade_grade_idgrade"] == _get_grade(member)[0] for result in member_results]:
+        elif False in [_correct_grade(member, result) for result in member_results]:
             derivation = Derivation.WG  # wrong grade in an event
             points = MIN_POINTS
         elif True in [result["status"] ==
