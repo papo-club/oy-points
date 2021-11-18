@@ -13,8 +13,8 @@ logging.basicConfig(level=logging.WARNING, format="")
 csv_path = path.join(path.dirname(__file__), "../..", argv[1])
 
 
-LIKELY_MATCH = 0.9
-POSSIBLE_MATCH = 0.7
+LIKELY_MATCH = 0.87
+POSSIBLE_MATCH = 0.75
 
 
 class _Match(object):
@@ -60,13 +60,17 @@ class _Competitor(_Person):
             gender: str,
             grade: str,
             time: Optional[timedelta],
-            status: str
+            status: str,
+            raw_points: int = None,
+            points: int = None,
     ) -> None:
         super().__init__(first_name, last_name, gender)
         self.dob = dob if dob else None
         self.grade = grade
         self.time = time
         self.status = status
+        self.raw_points = raw_points
+        self.points = points
 
 
 class _Member(_Person):
@@ -96,7 +100,7 @@ def _get_member_from_match(
 def _commit_member(member: _Member, competitor: _Competitor) -> None:
     cursor_dict.execute(
         "REPLACE INTO oypoints.result "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
         (
             member.memberid,
             selected_event["season_idyear"],
@@ -105,6 +109,8 @@ def _commit_member(member: _Member, competitor: _Competitor) -> None:
             competitor.grade,
             competitor.time,
             competitor.status,
+            competitor.raw_points,
+            competitor.points,
         ),
     )
 
@@ -288,31 +294,37 @@ grades = cursor_dict.fetchall()
 with open(csv_path, "r") as csvfile:
     reader = DictReader(csvfile)
 
-    race_grades = {*[row["Long"] for row in reader]}
-    for race_grade in race_grades:
-        if selected_grade := next(
-            (grade for grade in grades if grade["name"] == race_grade),
-                None):
-            selected_grade = selected_grade["idgrade"]
-
-        else:
-            logging.critical("Available grades:")
-            for grade in grades:
-                logging.critical(f"{grade['idgrade']}: {grade['name']}")
+    race_grades = {*[(row["Short"], row["Long"]) for row in reader]}
+    if {*[race_grade[0] for race_grade in race_grades]} == {*[
+            grade["idgrade"] for grade in grades]}:
+        for race_grade in race_grades:
+            cursor_dict.execute("REPLACE INTO oypoints.race_grade "
+                                "VALUES (%s, %s, %s, %s, %s)",
+                                [selected_event["season_idyear"],
+                                    selected_event["number"],
+                                    race_num,
+                                    race_grade[0],
+                                    race_grade[0]])
+    else:
+        logging.critical("Available grades:")
+        for race_grade in race_grades:
+            logging.critical(f"{race_grade[0]}: {race_grade[1]}")
+        for grade in grades:
             while True:
-                logging.critical(f"Match grade for {race_grade}?")
+                logging.critical(f"Match grade for {grade['name']}?")
                 selected_grade = stdin.readline().strip()
-                if selected_grade in grades:
+                if selected_grade in [race_grade[0]
+                                      for race_grade in race_grades]:
+                    cursor_dict.execute("REPLACE INTO oypoints.race_grade "
+                                        "VALUES (%s, %s, %s, %s, %s)",
+                                        [selected_event["season_idyear"],
+                                            selected_event["number"],
+                                            race_num,
+                                            grade["idgrade"],
+                                            selected_grade])
                     break
                 else:
                     logging.critical("That is not a valid grade.")
-        cursor_dict.execute("REPLACE INTO oypoints.race_grade "
-                            "VALUES (%s, %s, %s, %s, %s)",
-                            [selected_event["season_idyear"],
-                                selected_event["number"],
-                                race_num,
-                                selected_grade["idgrade"],
-                                race_grade])
 
 
 with open(csv_path, "r") as csvfile:
@@ -350,7 +362,9 @@ with open(csv_path, "r") as csvfile:
                 time=deltatime,
                 status=status_codes[int(
                     competitor_raw["Classifier"])
-                ]
+                ],
+                raw_points=competitor_raw["Points"] if race["discipline_iddiscipline"] == "SCO" else None,
+                points=competitor_raw["Score Result"] if race["discipline_iddiscipline"] == "SCO" else None,
             ),
         )
 
