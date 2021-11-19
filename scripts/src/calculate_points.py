@@ -82,40 +82,56 @@ class Derivation(Enum):
 
 
 cursor.execute("SELECT idgrade from oypoints.grade")
-grades = cursor.fetchall()
+grades = [grade[0] for grade in cursor.fetchall()]
 
 cursor.execute("DELETE FROM oypoints.points")
 for event in events:
-    cursor.execute(
-        "SELECT number from oypoints.race WHERE event_season_idyear=%s AND event_number=%s", [
+    cursor_dict.execute(
+        "SELECT discipline_iddiscipline, number, max_points from oypoints.race WHERE event_season_idyear=%s AND event_number=%s", [
             season, event["number"]])
-    races = [race[0] for race in cursor.fetchall()]
+    races = cursor_dict.fetchall()
     # calculate winning time
-    winning_times = {}
+    winners = {}
     for grade in grades:
-        cursor_dict.execute(
-            "SELECT member_idmember, race_number, race_grade_race_grade, time FROM oypoints.result "
-            "WHERE race_event_season_idyear=%s "
-            "AND race_event_number=%s "
-            "AND race_grade_race_grade=%s"
-            "AND status='OK'", [
-                season, event["number"], grade[0]])
-        race_results = cursor_dict.fetchall()
-
-        members_in_event = Counter(
-            [result["member_idmember"] for result in race_results])
-        valid_members = [
-            member for member,
-            member_races in members_in_event.items() if member_races == len(races)]
         best_time = timedelta(1, 0, 0)
-        for valid_member in valid_members:
-            member_race_results = [
-                result for result in race_results if result["member_idmember"] == valid_member]
-            time = sum([result["time"]
-                       for result in member_race_results], timedelta(0, 0, 0))
-            if time < best_time:
-                best_time = time
-        winning_times[grade[0]] = best_time
+        worst_time = timedelta(0, 0, 0)
+        best_points = 0
+        cursor.execute(
+            "SELECT member_idmember from oypoints.member_grade WHERE season_year=%s AND grade_idgrade=%s", [
+                season, grade])
+        grade_competitors = [member[0] for member in cursor.fetchall()]
+        for grade_competitor in grade_competitors:
+            cursor_dict.execute(
+                "SELECT time, points FROM oypoints.result "
+                "WHERE race_event_season_idyear=%s "
+                "AND race_event_number=%s "
+                "AND member_idmember=%s "
+                "AND status='OK'", [
+                    season, event["number"], grade_competitor])
+            competitor_results = cursor_dict.fetchall()
+            if not competitor_results:
+                continue  # this grade competitor did not compete in this event
+            if len(competitor_results) < len(races):
+                continue  # competitor did not compete in all events or did not get OK in both events
+            if races[0]["discipline_iddiscipline"] == "SCO":
+                if competitor_results[0]["points"] >= best_points:
+                    best_points = competitor_results[0]["points"]
+                    best_time = competitor_results[0]["time"]
+                if competitor_results[0]["points"] == races[0]["max_points"]:
+                    if competitor_results[0]["time"] > worst_time:
+                        worst_time = competitor_results[0]["time"]
+            else:
+                time = sum([result["time"]
+                            for result in competitor_results], timedelta(0, 0, 0))
+                if time < best_time:
+                    best_time = time
+        if races[0]["discipline_iddiscipline"] == "SCO":
+            winners[grade] = {
+                "best": (best_points, best_time),
+                "worst": (best_points, worst_time) if worst_time else None
+            }
+        else:
+            winners[grade] = best_time
 
     # get all results
     cursor_dict.execute(
@@ -130,7 +146,7 @@ for event in events:
 
         # get all results for member
         cursor_dict.execute(
-            "SELECT race_event_number, race_number, race_grade_race_grade, time, status FROM oypoints.result "
+            "SELECT race_event_number, race_number, race_grade_race_grade, time, status, points FROM oypoints.result "
             "WHERE race_event_season_idyear=%s "
             "AND race_event_number=%s "
             "AND member_idmember=%s", [
@@ -153,17 +169,53 @@ for event in events:
                     derivation = getattr(Derivation, result["status"])
                     points = MIN_POINTS
         else:  # all good :)
-            time = sum([result["time"]
-                       for result in member_results], timedelta(0, 0, 0))
+            if races[0]["discipline_iddiscipline"] == "SCO":
+                if winners[_get_grade(member)[0]
+                           ]["best"][0] == races[0]["max_points"]:
+                    if member_results[0]["points"] == races[0]["max_points"]:
+                        time = sum([result["time"]
+                                    for result in member_results], timedelta(0, 0, 0))
+                        points = max(
+                            round(
+                                MAX_POINTS * winners[_get_grade(member)[0]]["best"][1] / time, 2
 
-            points = max(
-                round(
-                    MAX_POINTS *
-                    (winning_times[_get_grade(member)[0]] / time),
-                    2,
-                ),
-                MIN_POINTS,
-            )
+                            ), MIN_POINTS,
+                        )  # scaled by time if same points
+                    else:
+                        slowest_competitor_points = max(
+                            round(
+                                MAX_POINTS * winners[_get_grade(member)[0]]["worst"][1] / time, 2
+
+                            ), MIN_POINTS,
+                        )  # scaled by time if same points
+                        points = max(
+                            round(
+                                slowest_competitor_points *
+                                races[0]["max_points"] /
+                                member_results[0]["points"],
+                                2),
+                            MIN_POINTS)
+                else:
+                    points = max(
+                        round(
+                            MAX_POINTS *
+                            (member_results[0]["points"] / winners[_get_grade(member)[0]]["best"][0]),
+                            2,
+                        ), MIN_POINTS,
+                    )
+
+            else:
+                time = sum([result["time"]
+                            for result in member_results], timedelta(0, 0, 0))
+
+                points = max(
+                    round(
+                        MAX_POINTS *
+                        (winners[_get_grade(member)[0]] / time),
+                        2,
+                    ),
+                    MIN_POINTS,
+                )
             if points == MAX_POINTS:
                 derivation = Derivation.WIN
             else:
