@@ -9,6 +9,11 @@ function App() {
   const [grades, setGrades] = useState(null);
   const [events, setEvents] = useState(null);
   const [receivedResponse, setReceivedResponse] = useState(false);
+  const derivationColors = {
+    WIN: "table-success",
+    PLAN: "table-warning",
+    CTRL: "table-warning",
+  };
   useEffect(() => {
     const api = "http://localhost:9000/";
     const endpoints = [
@@ -34,26 +39,29 @@ function App() {
                 <th>Place</th>
                 <th>Competitor</th>
                 {Object.entries(events).map(([idevent, event_]) => (
-                  <th>{event_.name}</th>
+                  <th style={{ width: "10%" }}>
+                    OY{idevent}
+                    <br />
+                    {event_.name}
+                    <br />
+                    {event_.discipline}
+                  </th>
                 ))}
-                <th>Total</th>
+                <th>Total /{25 * 5}</th>
               </thead>
               <tbody>
                 {console.log()}
                 {Object.entries(competitors)
                   .sort(
-                    (
-                      [idcompetitora, competitora],
-                      [idcompetitorb, competitorb]
-                    ) =>
-                      competitorb.qualified - competitora.qualified ||
-                      competitorb.totalPoints - competitora.totalPoints
+                    ([, a], [, b]) =>
+                      (b.qualified != "INEL") - (a.qualified != "INEL") ||
+                      b.totalPoints - a.totalPoints
                   )
                   .map(([idcompetitor, competitor], index) => (
                     <tr>
                       <th
                         className={`table-active ${
-                          competitor.qualified
+                          competitor.qualified != "INEL"
                             ? "fw-bold"
                             : "text-muted fst-italic"
                         }`}
@@ -62,25 +70,35 @@ function App() {
                       </th>
                       <th
                         className={`table-active ${
-                          competitor.qualified || "text-muted"
+                          competitor.qualified != "INEL" || "text-muted"
                         }`}
-                      >{`${competitor.firstName} ${competitor.lastName}`}</th>
+                      >
+                        <div>{`${competitor.firstName} ${competitor.lastName}`}</div>
+                        <div>{competitor.qualified}</div>
+                      </th>
                       {Object.entries(events).map(([idevent, event_]) => (
                         <td
                           className={
-                            competitor.results[idevent]?.qualified
-                              ? "fw-bold"
-                              : "text-muted fst-italic"
+                            competitor.results[idevent]?.countsTowardsTotal &&
+                            competitor.qualified != "INEL"
+                              ? derivationColors[
+                                  competitor.results[idevent]?.derivation
+                                ] + " fw-bold"
+                              : derivationColors[
+                                  competitor.results[idevent]?.derivation
+                                ] + " text-muted"
                           }
                         >
                           {competitor.results[idevent]?.points}
+                          <br />
+                          {competitor.results[idevent]?.derivation}
                         </td>
                       ))}
                       <td
                         className={`table-active ${
-                          competitor.qualified
+                          competitor.qualified != "INEL"
                             ? "fw-bold"
-                            : "text-muted fst-italic"
+                            : "text-muted"
                         }`}
                       >
                         {competitor.totalPoints}
