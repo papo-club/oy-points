@@ -93,8 +93,8 @@ for race in range(races_num):
 
     cursor_dict.execute(
         "REPLACE INTO oypoints.race "
-        "VALUES (%s, %s, %s, %s, %s)",
-        [season, number, race + 1, map_name, event_disc],
+        "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+        [season, number, race + 1, map_name, event_disc, None, None],
     )
 
 commit_and_close()

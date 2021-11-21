@@ -13,8 +13,8 @@ logging.basicConfig(level=logging.WARNING, format="")
 csv_path = path.join(path.dirname(__file__), "../..", argv[1])
 
 
-LIKELY_MATCH = 0.87
-POSSIBLE_MATCH = 0.75
+LIKELY_MATCH = 0.80
+POSSIBLE_MATCH = 0.65
 
 
 class _Match(object):
@@ -286,7 +286,8 @@ status_codes = {
     1: "DNS",
     2: "DNF",
     3: "MP",
-    4: "DQ"}
+    4: "DQ",
+    5: "NT"}
 
 cursor_dict.execute("SELECT * FROM oypoints.grade")
 grades = cursor_dict.fetchall()
@@ -331,7 +332,7 @@ with open(csv_path, "r") as csvfile:
     reader = DictReader(csvfile)
     for competitor_raw in reader:
         deltatime = None
-        if competitor_raw["Time"]:
+        if competitor_raw["Start"] and competitor_raw["Finish"]:
             finish_time = None
             start_time = None
             for timeformat in csv_timeformats:
@@ -347,6 +348,8 @@ with open(csv_path, "r") as csvfile:
                     pass
             if finish_time and start_time:
                 deltatime = finish_time - start_time
+        else:
+            competitor_raw["Classifier"] = 5
 
         competitors.append(
             _Competitor(
