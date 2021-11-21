@@ -57,13 +57,15 @@ const getPoints = (season) => {
       (err, rows, fields) => {
         if (err) throw err;
         resolve(
-          rows.map((row) => ({
-            points: row.points_generated,
-            derivation: row.points_derivation_idpoints_derivation,
-            countsTowardsTotal: Boolean(row.counts_towards_total),
-            member: row.member_grade_member_idmember,
-            event: row.event_number,
-          }))
+          rows
+            .map((row) => ({
+              points: row.points_generated,
+              derivation: row.points_derivation_idpoints_derivation,
+              countsTowardsTotal: Boolean(row.counts_towards_total),
+              member: row.member_grade_member_idmember,
+              event: row.event_number,
+            }))
+            .sort((a, b) => a.points - b.points)
         );
       }
     );

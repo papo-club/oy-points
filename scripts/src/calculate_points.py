@@ -162,24 +162,25 @@ for event in events:
             "AND race_event_number=%s "
             "AND member_idmember=%s", [
                 season, event["number"], member],)
-        member_results = cursor_dict.fetchall()
-        temp = []
+        member_all_results = cursor_dict.fetchall()
+        member_results = []
         for race in races:
-            for result in member_results:
+            for result in member_all_results:
                 if result["race_number"] == race["number"] and _correct_grade(member, result) and not len(
-                        [res for res in temp if res['race_number'] == race["number"]]):
-                    temp.append(result)
-        member_results = temp
-        if len(member_results) < len(races):
+                        [res for res in member_results if res['race_number'] == race["number"]]):
+                    member_results.append(result)
+        if len({*[result["race_number"]
+               for result in member_all_results]}) < len(races):
             derivation = Derivation.NA  # both races not attempted
-            points = None
-        elif False in [_correct_grade(member, result) for result in member_results]:
+            points = MIN_POINTS
+        elif len(member_results) < len(races):
             derivation = Derivation.WG  # wrong grade in an event
             points = MIN_POINTS
         elif True in [result["status"] ==
                       "DNS" for result in member_results]:
             derivation = Derivation.DNS  # dns in an event
-            points = False
+            points = None
+            continue  # throw away DNS
         elif False in [result["status"] ==  # non ok-status in an event
                        "OK" for result in member_results]:
             for result in member_results:
