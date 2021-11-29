@@ -9,6 +9,8 @@ mysql-connector-python = "*"
 python-dateutil = "*"
 pytimeparse = "*"
 python-levenshtein = "*"
+sqlalchemy = "*"
+mysqlclient = "*"
 
 [dev-packages]
 wemake-python-styleguide = "*"
