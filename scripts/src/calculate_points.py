@@ -3,7 +3,7 @@ from datetime import timedelta
 from enum import Enum
 from sys import stdin
 
-from sqlalchemy import update, desc
+from sqlalchemy import update, asc
 from helpers.connection import commit_and_close, session, tables
 
 logging.basicConfig(level=logging.INFO, format="")
@@ -274,8 +274,8 @@ counts_towards_total = {
 for member in members:
     results = session.query(
         tables.Points).filter_by(
-        member_grade_member_idmember=member)
-    results.order_by(desc(tables.Points.points_generated))
+        member_grade_member_idmember=member[0]).all()
+    results.sort(key=lambda result: result.points_generated or 0, reverse=True)
     for i, result in enumerate(results):
         if i >= counts_towards_total[events.count()]:
             session.execute(
@@ -284,7 +284,8 @@ for member in members:
                     tables.Points.member_grade_season_year == result.member_grade_season_year).where(
                     tables.Points.member_grade_member_idmember == result.member_grade_member_idmember).where(
                     tables.Points.event_number == result.event_number).where(
-                        tables.Points.points_derivation_idpoints_derivation == result.points_derivation_idpoints_derivation))
+                        tables.Points.points_derivation_idpoints_derivation == result.points_derivation_idpoints_derivation).values(
+                            counts_towards_total=False))
 
 
 commit_and_close()

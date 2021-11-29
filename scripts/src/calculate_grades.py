@@ -47,7 +47,14 @@ session.query(tables.Points).delete()
 
 for member in members:
     events_raced = len(
-        set(session.query(tables.Result).filter_by(member_idmember=member.idmember)))
+        set(
+            session.query(
+                tables.EventAdmins.event_number).filter_by(
+                member_idmember=member.idmember).all() +
+            session.query(
+                    tables.Result.race_event_number).filter_by(
+                        member_idmember=member.idmember).filter(
+                            tables.Result.status != "DNS").all()))
     if events_raced < events_needed_so_far_to_qualify:
         eligibility = Eligibility.INEL
     elif events_raced >= events_needed_to_qualify:
@@ -64,7 +71,7 @@ for member in members:
             race_event_season_idyear=season,
             race_event_number=event.number,
             member_idmember=member.idmember).first()
-        if grade.count() == 0:
+        if not grade:
             continue
         oy_grades = session.query(
             tables.RaceGrade).filter_by(
