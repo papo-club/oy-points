@@ -6,8 +6,9 @@ from os import path
 from sys import argv, stdin
 from typing import Optional
 
-from fuzzywuzzy import fuzz, process  # type: ignore
-from helpers.connection import commit_and_close, cursor_dict
+from fuzzywuzzy import fuzz, process
+from sqlalchemy.sql.elements import ReleaseSavepointClause  # type: ignore
+from helpers.connection import commit_and_close, session, tables
 
 logging.basicConfig(level=logging.WARNING, format="")
 csv_path = path.join(path.dirname(__file__), "../..", argv[1])
@@ -98,20 +99,18 @@ def _get_member_from_match(
 
 
 def _commit_member(member: _Member, competitor: _Competitor) -> None:
-    cursor_dict.execute(
-        "REPLACE INTO oypoints.result "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-        (
-            member.memberid,
-            selected_event["season_idyear"],
-            selected_event["number"],
-            race_num,
-            competitor.grade,
-            competitor.time,
-            competitor.status,
-            competitor.raw_points,
-            competitor.points,
-        ),
+    session.merge(
+        tables.Result(
+            member_idmember=member.memberid,
+            race_event_season_idyear=selected_event.season_idyear,
+            race_event_number=selected_event.number,
+            race_number=race_num,
+            race_grade_race_grade=competitor.grade,
+            time=competitor.time,
+            status=competitor.status,
+            raw_points=competitor.raw_points,
+            points=competitor.points
+        )
     )
 
 
@@ -217,17 +216,16 @@ def _get_matches(competitor: _Competitor, members: list[_Member]) -> None:
         )
 
 
-cursor_dict.execute("SELECT * FROM oypoints.event")
-events = cursor_dict.fetchall()
+events = session.query(tables.Event)
 
 logging.critical("select event: ")
 for event in events:
-    year = str(event["season_idyear"])[-2:]
-    number = event["number"]
+    year = str(event.season_idyear)[-2:]
+    number = event.number
     logging.critical(
         f"[{year}{number:02}] "
-        f"{event['season_idyear']} "
-        f"OY{event['number']}",
+        f"{event.season_idyear} "
+        f"OY{event.number}",
     )
 
 selected_event = event
@@ -235,8 +233,8 @@ while True:
     logging.critical("event code?")
     event_code = stdin.readline().strip()
     for event in events:
-        year = str(event["season_idyear"])[-2:]
-        number = event["number"]
+        year = str(event.season_idyear)[-2:]
+        number = event.number
         if str(year == event_code[:2]):
             if event_code[-2:] == f"{number:02}":
                 selected_event = event
@@ -246,12 +244,13 @@ while True:
         continue
     break
 
-cursor_dict.execute(
-    f"SELECT * FROM oypoints.race WHERE event_season_idyear={year} AND event_number={selected_event['number']}")
-races = cursor_dict.fetchall()
+races = session.query(
+    tables.Race).filter_by(
+        event_season_idyear=year,
+    event_number=selected_event.number)
 
 for race in races:
-    logging.critical(f'{race["number"]}: {race["map"]}')
+    logging.critical(f'{race.number}: {race.map}')
 while True:
     logging.critical("Race in event?")
     try:
@@ -259,23 +258,22 @@ while True:
     except BaseException:
         logging.critical("Not a valid race number.")
         continue
-    if race_num in [race["number"] for race in races]:
+    if race_num in [race.number for race in races]:
         break
 
 
-cursor_dict.execute("SELECT * FROM oypoints.member")
 members = []
 competitors = []
 non_members: list[_Competitor] = []
 
-for member in cursor_dict.fetchall():
+for member in session.query(tables.Member):
     members.append(
         _Member(
-            first_name=member["first_name"],
-            last_name=member["last_name"],
-            dob=member["DOB"],
-            gender=member["gender"],
-            memberid=member["idmember"],
+            first_name=member.first_name,
+            last_name=member.last_name,
+            dob=member.DOB,
+            gender=member.gender,
+            memberid=member.idmember,
         ),
     )
 
@@ -289,40 +287,41 @@ status_codes = {
     4: "DQ",
     5: "NT"}
 
-cursor_dict.execute("SELECT * FROM oypoints.grade")
-grades = cursor_dict.fetchall()
+grades = session.query(tables.Grade)
 
 with open(csv_path, "r") as csvfile:
     reader = DictReader(csvfile)
 
     race_grades = {*[(row["Short"], row["Long"]) for row in reader]}
     if {*[race_grade[0] for race_grade in race_grades]} == {*[
-            grade["idgrade"] for grade in grades]}:
+            grade.idgrade for grade in grades]}:
         for race_grade in race_grades:
-            cursor_dict.execute("REPLACE INTO oypoints.race_grade "
-                                "VALUES (%s, %s, %s, %s, %s)",
-                                [selected_event["season_idyear"],
-                                    selected_event["number"],
-                                    race_num,
-                                    race_grade[0],
-                                    race_grade[0]])
+            session.merge(
+                tables.RaceGrade(
+                    race_event_season_idyear=selected_event.season_idyear,
+                    race_event_number=selected_event.number,
+                    race_number=race_num,
+                    grade_idgrade=race_grade[0],
+                    race_grade=race_grade[0]
+                )
+            )
     else:
         logging.critical("Available grades:")
         for race_grade in race_grades:
             logging.critical(f"{race_grade[0]}: {race_grade[1]}")
         for grade in grades:
             while True:
-                logging.critical(f"Match grade for {grade['name']}?")
+                logging.critical(f"Match grade for {grade.name}?")
                 selected_grade = stdin.readline().strip()
                 if selected_grade in [race_grade[0]
                                       for race_grade in race_grades]:
-                    cursor_dict.execute("REPLACE INTO oypoints.race_grade "
-                                        "VALUES (%s, %s, %s, %s, %s)",
-                                        [selected_event["season_idyear"],
-                                            selected_event["number"],
-                                            race_num,
-                                            grade["idgrade"],
-                                            selected_grade])
+                    session.merge(
+                        tables.RaceGrade(
+                            race_event_season_idyear=selected_event.season_idyear,
+                            race_event_number=selected_event.number,
+                            race_number=race_num,
+                            grade_idgrade=grade.idgrade,
+                            race_grade=selected_grade))
                     break
                 else:
                     logging.critical("That is not a valid grade.")
@@ -366,8 +365,8 @@ with open(csv_path, "r") as csvfile:
                 status=status_codes[int(
                     competitor_raw["Classifier"])
                 ],
-                raw_points=competitor_raw["Points"] if race["discipline_iddiscipline"] == "SCO" else None,
-                points=competitor_raw["Score Result"] if race["discipline_iddiscipline"] == "SCO" else None,
+                raw_points=competitor_raw["Points"] if race.discipline_iddiscipline == "SCO" else None,
+                points=competitor_raw["Score Result"] if race.discipline_iddiscipline == "SCO" else None,
             ),
         )
 

@@ -2,20 +2,19 @@ import logging
 from sys import stdin
 
 from dateutil import parser
-from helpers.connection import commit_and_close, cursor_dict
+from helpers.connection import session, tables, commit_and_close
+from sqlalchemy import select
 
 MAX_EVENTS = 10
 
 logging.basicConfig(level=logging.INFO, format="")
 
-cursor_dict.execute("SELECT year FROM oypoints.season")
-seasons = cursor_dict.fetchall()
-cursor_dict.execute("SELECT * FROM oypoints.discipline")
-disciplines = cursor_dict.fetchall()
+seasons = session.query(tables.Season.year)
+disciplines = session.query(tables.Discipline)
 
 logging.info("available seasons:")
 for season in seasons:
-    logging.info(season["year"])
+    logging.info(season.year)
 while True:
     logging.info("season?")
     try:
@@ -23,7 +22,7 @@ while True:
     except ValueError:
         logging.info("that is not a valid season.")
     else:
-        if season in {field["year"] for field in seasons}:
+        if season in {field.year for field in seasons}:
             break
         logging.info("that is not a valid season.")
 
@@ -52,10 +51,14 @@ while True:
         break
 
 logging.info("adding event to record...")
-cursor_dict.execute(
-    "REPLACE INTO oypoints.event "
-    "VALUES (%s, %s, %s, %s)",
-    [season, number, date, name])
+session.add(
+    tables.Event(
+        season_idyear=season,
+        number=number,
+        date=date,
+        name=name,
+    ),
+)
 
 while True:
     logging.info("amount of races in event?")
@@ -79,22 +82,27 @@ for race in range(races_num):
 
     logging.info("available disciplines:")
     for discipline in disciplines:
-        logging.info(f"{discipline['iddiscipline']}: {discipline['name']}")
+        logging.info(f"{discipline.iddiscipline}: {discipline.name}")
     while True:
         logging.info("discipline code?")
         event_disc = stdin.readline().strip().upper()
         discipline_ids = {
-            discipline["iddiscipline"].upper() for discipline in disciplines
+            discipline.iddiscipline.upper() for discipline in disciplines
         }
         if event_disc in discipline_ids:
             break
         else:
             logging.info("that is not a valid discipline.")
 
-    cursor_dict.execute(
-        "REPLACE INTO oypoints.race "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s)",
-        [season, number, race + 1, map_name, event_disc, None, None],
+    session.add(
+        tables.Race(
+            event_season_idyear=season,
+            event_number=number,
+            number=race + 1,
+            map=map_name,
+            discipline_iddiscipline=event_disc
+        )
     )
+
 
 commit_and_close()
