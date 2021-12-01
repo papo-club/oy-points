@@ -12,7 +12,6 @@ MAX_POINTS = 25
 MIN_POINTS = 10
 
 seasons = session.query(tables.Season)
-members = session.query(tables.Member)
 grades = session.query(tables.Grade)
 
 logging.info("available seasons:")
@@ -29,7 +28,8 @@ while True:
             break
         logging.info("that is not a valid season.")
 
-events = session.query(tables.Event).filter_by(season_idyear=season)
+members = session.query(tables.Member).filter_by(year=season)
+events = session.query(tables.Event).filter_by(year=season)
 events_finished = sum([event.date <= date.today() for event in events])
 events_to_go = events.count() - events_finished
 events_needed_to_qualify = 3
@@ -43,18 +43,21 @@ class Eligibility(Enum):
     QUAL = "Qualified"
 
 
-session.query(tables.Points).delete()
+session.query(tables.Points).filter_by(year=season).delete()
 
 for member in members:
     events_raced = len(
         set(
             session.query(
                 tables.EventAdmins.event_number).filter_by(
-                member_idmember=member.idmember).all() +
+                member_id=member.member_id,
+                year=season).all() +
             session.query(
-                    tables.Result.race_event_number).filter_by(
-                        member_idmember=member.idmember).filter(
-                            tables.Result.status != "DNS").all()))
+                    tables.Result.event_number).filter_by(
+                        member_id=member.member_id,
+                        year=season).filter(
+                            tables.Result.status != "DNS").filter(
+                                tables.Result.status != "NT").all()))
     if events_raced < events_needed_so_far_to_qualify:
         eligibility = Eligibility.INEL
     elif events_raced >= events_needed_to_qualify:
@@ -66,37 +69,45 @@ for member in members:
       # member has only competed in non OY grade races
     member_oy_grades = Counter()
     for event in events:
-        grade = session.query(
+        grades = session.query(
             tables.Result).filter_by(
-            race_event_season_idyear=season,
-            race_event_number=event.number,
-            member_idmember=member.idmember).first()
-        if not grade:
+            year=season,
+            event_number=event.number,
+            member_id=member.member_id).all()
+        if not grades:
             continue
-        oy_grades = session.query(
-            tables.RaceGrade).filter_by(
-            race_grade=grade.race_grade_race_grade,
-            race_event_number=event.number)
-        difficulty = 0
-        selected_grade = None
-        for oy_grade in oy_grades:
-            grade_difficulty = session.query(
-                tables.Grade).filter_by(
-                gender=member.gender,
-                idgrade=oy_grade.grade_idgrade).first()
-            if grade_difficulty:  # does not exist if wrong gender
-                if grade_difficulty.difficulty > difficulty:
-                    difficulty = grade_difficulty.difficulty
-                    selected_grade = oy_grade.grade_idgrade
-        if selected_grade:
-            member_oy_grades[selected_grade] += 1
+        for grade in grades:
+            oy_grades = session.query(
+                tables.RaceGrade).filter_by(
+                race_grade=grade.race_grade,
+                race_number=1,
+                event_number=event.number, year=season)
+            difficulty = 0
+            for oy_grade in oy_grades:
+                member_oy_grades[oy_grade.grade_id] += 1
     if member_oy_grades:
+
+        most_races = member_oy_grades.most_common(1)[0][1]
+        most_raced_grades = [
+            member_oy_grade for member_oy_grade,
+            count in member_oy_grades.items() if count == most_races]
+
+        final_grade = None
+        difficulty = 0
+        for grade in most_raced_grades:
+            standard_grade = session.query(tables.Grade).filter_by(
+                grade_id=grade
+            ).first()
+            if standard_grade.difficulty > difficulty:
+                difficulty = standard_grade.difficulty
+                final_grade = standard_grade.grade_id
+
         session.merge(
             tables.MemberGrade(
-                season_year=season,
-                member_idmember=member.idmember,
-                grade_idgrade=member_oy_grades.most_common(1)[0][0],
-                eligibility_ideligibility=eligibility.name
+                year=season,
+                member_id=member.member_id,
+                grade_id=standard_grade.grade_id,
+                eligibility_id=eligibility.name
             )
         )
 

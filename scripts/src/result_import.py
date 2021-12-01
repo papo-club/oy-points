@@ -7,7 +7,6 @@ from sys import argv, stdin
 from typing import Optional
 
 from fuzzywuzzy import fuzz, process
-from sqlalchemy.sql.elements import ReleaseSavepointClause  # type: ignore
 from helpers.connection import commit_and_close, session, tables
 
 logging.basicConfig(level=logging.WARNING, format="")
@@ -15,7 +14,23 @@ csv_path = path.join(path.dirname(__file__), "../..", argv[1])
 
 
 LIKELY_MATCH = 0.80
-POSSIBLE_MATCH = 0.65
+POSSIBLE_MATCH = 0.75
+
+
+seasons = session.query(tables.Season.year)
+logging.critical("available seasons:")
+for season in seasons:
+    logging.critical(season.year)
+while True:
+    logging.critical("season?")
+    try:
+        season = int(stdin.readline())
+    except ValueError:
+        logging.critical("that is not a valid season.")
+    else:
+        if season in {field.year for field in seasons}:
+            break
+        logging.critical("that is not a valid season.")
 
 
 class _Match(object):
@@ -101,11 +116,11 @@ def _get_member_from_match(
 def _commit_member(member: _Member, competitor: _Competitor) -> None:
     session.merge(
         tables.Result(
-            member_idmember=member.memberid,
-            race_event_season_idyear=selected_event.season_idyear,
-            race_event_number=selected_event.number,
+            member_id=member.memberid,
+            year=selected_event.year,
+            event_number=selected_event.number,
             race_number=race_num,
-            race_grade_race_grade=competitor.grade,
+            race_grade=competitor.grade,
             time=competitor.time,
             status=competitor.status,
             raw_points=competitor.raw_points,
@@ -216,29 +231,23 @@ def _get_matches(competitor: _Competitor, members: list[_Member]) -> None:
         )
 
 
-events = session.query(tables.Event)
+events = session.query(tables.Event).filter_by(year=season)
 
 logging.critical("select event: ")
 for event in events:
-    year = str(event.season_idyear)[-2:]
     number = event.number
     logging.critical(
-        f"[{year}{number:02}] "
-        f"{event.season_idyear} "
         f"OY{event.number}",
     )
 
-selected_event = event
+selected_event = None
 while True:
-    logging.critical("event code?")
+    logging.critical("event?")
     event_code = stdin.readline().strip()
     for event in events:
-        year = str(event.season_idyear)[-2:]
-        number = event.number
-        if str(year == event_code[:2]):
-            if event_code[-2:] == f"{number:02}":
-                selected_event = event
-                break
+        if event_code == str(event.number):
+            selected_event = event
+            break
     else:
         logging.critical("that is not a valid event code.")
         continue
@@ -246,7 +255,7 @@ while True:
 
 races = session.query(
     tables.Race).filter_by(
-        event_season_idyear=year,
+        year=season,
     event_number=selected_event.number)
 
 for race in races:
@@ -266,14 +275,14 @@ members = []
 competitors = []
 non_members: list[_Competitor] = []
 
-for member in session.query(tables.Member):
+for member in session.query(tables.Member).filter_by(year=season):
     members.append(
         _Member(
             first_name=member.first_name,
             last_name=member.last_name,
             dob=member.DOB,
             gender=member.gender,
-            memberid=member.idmember,
+            memberid=member.member_id,
         ),
     )
 
@@ -294,14 +303,14 @@ with open(csv_path, "r") as csvfile:
 
     race_grades = {*[(row["Short"], row["Long"]) for row in reader]}
     if {*[race_grade[0] for race_grade in race_grades]} == {*[
-            grade.idgrade for grade in grades]}:
+            grade.grade_id for grade in grades]}:
         for race_grade in race_grades:
             session.merge(
                 tables.RaceGrade(
-                    race_event_season_idyear=selected_event.season_idyear,
-                    race_event_number=selected_event.number,
+                    year=selected_event.year,
+                    event_number=selected_event.number,
                     race_number=race_num,
-                    grade_idgrade=race_grade[0],
+                    grade_id=race_grade[0],
                     race_grade=race_grade[0]
                 )
             )
@@ -317,10 +326,10 @@ with open(csv_path, "r") as csvfile:
                                       for race_grade in race_grades]:
                     session.merge(
                         tables.RaceGrade(
-                            race_event_season_idyear=selected_event.season_idyear,
-                            race_event_number=selected_event.number,
+                            year=selected_event.year,
+                            event_number=selected_event.number,
                             race_number=race_num,
-                            grade_idgrade=grade.idgrade,
+                            grade_id=grade.grade_id,
                             race_grade=selected_grade))
                     break
                 else:
@@ -347,8 +356,14 @@ with open(csv_path, "r") as csvfile:
                     pass
             if finish_time and start_time:
                 deltatime = finish_time - start_time
+                if deltatime < timedelta(0, 0, 0):
+                    t = date.time.strptime(competitor_raw["Time"], timeformat)
+                    deltatime = timedelta(
+                        hours=t.hour, minutes=t.minue, seconds=t.second
+                    )
         else:
-            competitor_raw["Classifier"] = 5
+            if status_codes[int(competitor_raw["Classifier"])] in ["OK", "MP"]:
+                raise Exception("No time but OK classifier")
 
         competitors.append(
             _Competitor(
@@ -361,12 +376,12 @@ with open(csv_path, "r") as csvfile:
                 ) if competitor_raw["YB"] else None,
                 gender=competitor_raw["S"],
                 grade=competitor_raw["Short"],
-                time=deltatime,
+                time=getattr(deltatime, "seconds") if deltatime else None,
                 status=status_codes[int(
                     competitor_raw["Classifier"])
                 ],
-                raw_points=competitor_raw["Points"] if race.discipline_iddiscipline == "SCO" else None,
-                points=competitor_raw["Score Result"] if race.discipline_iddiscipline == "SCO" else None,
+                raw_points=competitor_raw["Points"] or None if race.discipline_id == "SCO" else None,
+                points=competitor_raw["Score Result"] or None if race.discipline_id == "SCO" else None,
             ),
         )
 

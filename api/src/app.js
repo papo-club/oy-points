@@ -18,19 +18,59 @@ connection.connect();
 const MIN_EVENTS_TO_QUALIFY = 3;
 const BEST_X_SCORES = 4;
 
-const getMembers = () => {
+const getMembers = (season) => {
   return new Promise((resolve, reject) => {
-    connection.query("SELECT * from oypoints.member", (err, rows, fields) => {
-      if (err) throw err;
-      members = {};
-      for (row of rows) {
-        members[row.idmember] = {
-          lastName: row.last_name,
-          firstName: row.first_name,
-        };
+    connection.query(
+      `SELECT * from oypoints.member WHERE year=${season}`,
+      (err, rows, fields) => {
+        if (err) throw err;
+        members = {};
+        for (row of rows) {
+          members[row.member_id] = {
+            lastName: row.last_name,
+            firstName: row.first_name,
+          };
+        }
+        resolve(members);
       }
-      resolve(members);
-    });
+    );
+  });
+};
+
+const getEligibility = () => {
+  return new Promise((resolve, reject) => {
+    connection.query(
+      `SELECT * from oypoints.eligibility`,
+      (err, rows, fields) => {
+        if (err) throw err;
+        eligibility = {};
+        for (row of rows) {
+          eligibility[row.eligibility_id] = {
+            name: row.type,
+          };
+        }
+        resolve(eligibility);
+      }
+    );
+  });
+};
+
+const getDerivation = () => {
+  return new Promise((resolve, reject) => {
+    connection.query(
+      `SELECT * from oypoints.points_derivation`,
+      (err, rows, fields) => {
+        if (err) throw err;
+        derivation = {};
+        for (row of rows) {
+          derivation[row.points_derivation_id] = {
+            name: row.type,
+            description: row.description,
+          };
+        }
+        resolve(derivation);
+      }
+    );
   });
 };
 
@@ -40,9 +80,10 @@ const getGrades = (season) => {
       if (err) throw err;
       grades = {};
       rows.forEach((row) => {
-        grades[row.idgrade] = {
+        grades[row.grade_id] = {
           name: row.name,
           gender: row.gender,
+          difficulty: row.difficulty,
         };
       });
       resolve(grades);
@@ -53,16 +94,16 @@ const getGrades = (season) => {
 const getPoints = (season) => {
   return new Promise((resolve, reject) => {
     connection.query(
-      `SELECT * from oypoints.points WHERE event_season_idyear=${season}`,
+      `SELECT * from oypoints.points WHERE year=${season}`,
       (err, rows, fields) => {
         if (err) throw err;
         resolve(
           rows
             .map((row) => ({
               points: row.points_generated,
-              derivation: row.points_derivation_idpoints_derivation,
+              derivation: row.points_derivation_id,
               countsTowardsTotal: Boolean(row.counts_towards_total),
-              member: row.member_grade_member_idmember,
+              member: row.member_id,
               event: row.event_number,
             }))
             .sort((a, b) => a.points - b.points)
@@ -75,14 +116,12 @@ const getPoints = (season) => {
 const getEvent = (season, number) => {
   return new Promise((resolve, reject) => {
     connection.query(
-      `SELECT * from oypoints.race WHERE event_season_idyear=${season} AND event_number=${number}`,
+      `SELECT * from oypoints.race WHERE year=${season} AND event_number=${number}`,
       (err, rows, fields) => {
         if (err) throw err;
         resolve({
-          name: rows.map((row) => row.map.split(" ")[0]).join(" + "),
-          discipline: rows
-            .map((row) => row.discipline_iddiscipline)
-            .join(" + "),
+          name: rows.map((row) => row.map).join(" + "),
+          discipline: rows.map((row) => row.discipline_id).join(" + "),
         });
       }
     );
@@ -92,7 +131,7 @@ const getEvent = (season, number) => {
 const getEvents = (season) => {
   return new Promise((resolve, reject) => {
     connection.query(
-      `SELECT * from oypoints.event WHERE season_idyear=${season}`,
+      `SELECT * from oypoints.event WHERE year=${season}`,
       (err, rows, fields) => {
         if (err) throw err;
         res = {};
@@ -114,17 +153,17 @@ const getEvents = (season) => {
   });
 };
 
-const getMemberGradeAndEligibility = (id) => {
+const getMemberGradeAndEligibility = (id, season) => {
   return new Promise((resolve, reject) => {
     connection.query(
-      `SELECT grade_idgrade, eligibility_ideligibility from oypoints.member_grade WHERE member_idmember=${id}`,
+      `SELECT grade_id, eligibility_id from oypoints.member_grade WHERE member_id=${id} AND year=${season}`,
       (err, rows, fields) => {
         if (err) throw err;
         if (rows.length) {
           let row = rows[0];
           resolve({
-            eligibility: row.eligibility_ideligibility,
-            grade: row.grade_idgrade,
+            eligibility: row.eligibility_id,
+            grade: row.grade_id,
           });
         } else {
           resolve(null);
@@ -139,7 +178,7 @@ app.get("/", (req, res) => {
 });
 
 app.get("/members", (req, res) => {
-  getMembers().then((members) => res.send(members));
+  getMembers("2021").then((members) => res.send(members));
 });
 
 app.get("/grades", (req, res) => {
@@ -150,6 +189,14 @@ app.get("/events", (req, res) => {
   getEvents("2021").then((events) => res.send(events));
 });
 
+app.get("/eligibility", (req, res) => {
+  getEligibility().then((eligibility) => res.send(eligibility));
+});
+
+app.get("/derivation", (req, res) => {
+  getDerivation().then((derivation) => res.send(derivation));
+});
+
 app.get("/points", (req, res) => {
   getGrades("2021")
     .then((grades) => {
@@ -158,18 +205,20 @@ app.get("/points", (req, res) => {
       );
     })
     .then((return_result) => {
-      getMembers().then((members) => {
+      getMembers("2021").then((members) => {
         let membersWithGrades = Object.entries(members).map(([id, member]) => {
-          return getMemberGradeAndEligibility(id).then((memberStatus) => {
-            if (memberStatus) {
-              return_result[memberStatus["grade"]][id] = {
-                ...member,
-                // totalPoints: totalPoints.toFixed(2),
-                qualified: memberStatus["eligibility"],
-                results: {},
-              };
+          return getMemberGradeAndEligibility(id, "2021").then(
+            (memberStatus) => {
+              if (memberStatus) {
+                return_result[memberStatus["grade"]][id] = {
+                  ...member,
+                  // totalPoints: totalPoints.toFixed(2),
+                  qualified: memberStatus["eligibility"],
+                  results: {},
+                };
+              }
             }
-          });
+          );
         });
         Promise.all(membersWithGrades)
           .then(() => getPoints("2021"))
@@ -177,34 +226,35 @@ app.get("/points", (req, res) => {
             Promise.all(
               points.map((point) => {
                 return getEvent("2021", point.event).then((_event) => {
-                  return getMemberGradeAndEligibility(point.member).then(
-                    (memberStatus) => {
-                      if (return_result[memberStatus["grade"]][point.member]) {
-                        return_result[memberStatus["grade"]][
-                          point.member
-                        ].results[point.event] = {
-                          derivation: point.derivation,
-                          points: point.points,
-                          countsTowardsTotal: point.countsTowardsTotal,
-                        };
-                      }
+                  return getMemberGradeAndEligibility(
+                    point.member,
+                    "2021"
+                  ).then((memberStatus) => {
+                    if (return_result[memberStatus["grade"]][point.member]) {
+                      return_result[memberStatus["grade"]][
+                        point.member
+                      ].results[point.event] = {
+                        derivation: point.derivation,
+                        points: point.points,
+                        countsTowardsTotal: point.countsTowardsTotal,
+                      };
                     }
-                  );
+                  });
                 });
               })
             )
               .then(() => {
-                Object.entries(return_result).map(([idgrade, members]) =>
-                  Object.entries(members).map(([idmember, member]) => {
+                Object.entries(return_result).map(([grade_id, members]) =>
+                  Object.entries(members).map(([member_id, member]) => {
                     const totalPoints = Object.entries(member.results).reduce(
                       (acc, [idevent, _event]) =>
-                        return_result[idgrade][idmember].results[idevent]
+                        return_result[grade_id][member_id].results[idevent]
                           .countsTowardsTotal
                           ? acc + _event.points
                           : acc,
                       0
                     );
-                    return_result[idgrade][idmember].totalPoints =
+                    return_result[grade_id][member_id].totalPoints =
                       +totalPoints.toFixed(2);
                   })
                 );

@@ -53,7 +53,7 @@ while True:
 logging.info("adding event to record...")
 session.add(
     tables.Event(
-        season_idyear=season,
+        year=season,
         number=number,
         date=date,
         name=name,
@@ -82,12 +82,12 @@ for race in range(races_num):
 
     logging.info("available disciplines:")
     for discipline in disciplines:
-        logging.info(f"{discipline.iddiscipline}: {discipline.name}")
+        logging.info(f"{discipline.discipline_id}: {discipline.name}")
     while True:
         logging.info("discipline code?")
         event_disc = stdin.readline().strip().upper()
         discipline_ids = {
-            discipline.iddiscipline.upper() for discipline in disciplines
+            discipline.discipline_id.upper() for discipline in disciplines
         }
         if event_disc in discipline_ids:
             break
@@ -96,11 +96,11 @@ for race in range(races_num):
 
     session.add(
         tables.Race(
-            event_season_idyear=season,
+            year=season,
             event_number=number,
             number=race + 1,
             map=map_name,
-            discipline_iddiscipline=event_disc
+            discipline_id=event_disc
         )
     )
 
