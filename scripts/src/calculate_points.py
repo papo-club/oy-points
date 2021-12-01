@@ -27,8 +27,8 @@ while True:
             break
         logging.info("that is not a valid season.")
 
-events = session.query(tables.Event).filter_by(season_idyear=season)
-grades = session.query(tables.Grade.idgrade)
+events = session.query(tables.Event).filter_by(year=season)
+grades = session.query(tables.Grade.grade_id)
 
 
 def _timesort(row: dict) -> timedelta:
@@ -37,17 +37,18 @@ def _timesort(row: dict) -> timedelta:
 
 def _get_grade(competitor):
     return session.query(
-        tables.MemberGrade.grade_idgrade).filter_by(
-        member_idmember=competitor)
+        tables.MemberGrade.grade_id).filter_by(
+        member_id=competitor,
+        year=season)
 
 
 def _correct_grade(member, result):
     valid_grades = session.query(
-        tables.RaceGrade.grade_idgrade).filter_by(
-        race_event_season_idyear=season,
-        race_event_number=result.race_event_number,
+        tables.RaceGrade.grade_id).filter_by(
+        year=season,
+        event_number=result.event_number,
         race_number=result.race_number,
-        race_grade=result.race_grade_race_grade)
+        race_grade=result.race_grade)
     competitor_grade = _get_grade(member)
     return competitor_grade.first() in valid_grades.all()
 
@@ -67,11 +68,11 @@ class Derivation(Enum):
     WIN = "Winner"
 
 
-session.query(tables.Points).delete()
+session.query(tables.Points).filter_by(year=season).delete()
 for event in events:
     races = session.query(
         tables.Race).filter_by(
-        event_season_idyear=season,
+        year=season,
         event_number=event.number)
     # calculate winning time
     winners = {}
@@ -80,27 +81,27 @@ for event in events:
         worst_time = timedelta(0, 0, 0)
         best_points = 0
         grade_competitors = session.query(
-            tables.MemberGrade.member_idmember).filter_by(
-            season_year=season,
-            grade_idgrade=grade.idgrade).filter(
-            tables.MemberGrade.eligibility_ideligibility != "INEL")
+            tables.MemberGrade.member_id).filter_by(
+            year=season,
+            grade_id=grade.grade_id).filter(
+            tables.MemberGrade.eligibility_id != "INEL")
         for grade_competitor in grade_competitors:
             race_grade = session.query(
                 tables.RaceGrade.race_grade).filter_by(
-                grade_idgrade=grade.idgrade,
-                race_event_number=event.number).first()[0]
+                grade_id=grade.grade_id,
+                event_number=event.number, year=season).first()[0]
             competitor_results = session.query(
                 tables.Result).filter_by(
-                race_event_season_idyear=season,
-                race_event_number=event.number,
-                race_grade_race_grade=race_grade,
-                member_idmember=grade_competitor.member_idmember).filter(
+                year=season,
+                event_number=event.number,
+                race_grade=race_grade,
+                member_id=grade_competitor.member_id).filter(
                 tables.Result.status == "OK")
             if competitor_results.count() == 0:
                 continue  # this grade competitor did not compete in this event
             if competitor_results.count() < races.count():
                 continue  # competitor did not compete in all events or did not get OK in both events
-            if races[0].discipline_iddiscipline == "SCO":
+            if races[0].discipline_id == "SCO":
                 if competitor_results[0].points > best_points:
                     best_points = competitor_results[0].points
                     best_time = timedelta(0, competitor_results[0].time, 0)
@@ -117,28 +118,33 @@ for event in events:
                 if time and time < best_time:
                     best_time = time
         if not best_time == timedelta(1, 0, 0):
-            if races[0].discipline_iddiscipline == "SCO":
-                winners[grade.idgrade] = {
+            if races[0].discipline_id == "SCO":
+                winners[grade.grade_id] = {
                     "best": (best_points, best_time),
                     "worst": (best_points, worst_time) if worst_time else None
                 }
             else:
-                winners[grade.idgrade] = best_time
+                winners[grade.grade_id] = best_time
 
     # get all results
     results = session.query(
         tables.Result).filter_by(
-        race_event_season_idyear=season,
-        race_event_number=event.number)
-    competing_members = {*[result.member_idmember for result in results]}
+        year=season,
+        event_number=event.number)
+    competing_members = {*[result.member_id for result in results]}
     for member in competing_members:
 
         # get all results for member
         member_all_results = session.query(
             tables.Result).filter_by(
-            race_event_season_idyear=season,
-            race_event_number=event.number,
-            member_idmember=member)
+            year=season,
+            event_number=event.number,
+            member_id=member)
+        if False not in [result.status in (
+                "DNS", "NT") for result in member_all_results]:
+            derivation = Derivation.DNS  # dns in an event
+            points = None
+            continue  # throw away DNS
         member_results = []
         for race in races:
             for result in member_all_results:
@@ -152,11 +158,6 @@ for event in events:
         elif len(member_results) < races.count():
             derivation = Derivation.WG  # wrong grade in an event
             points = MIN_POINTS
-        elif True in [result.status ==
-                      "DNS" for result in member_results]:
-            derivation = Derivation.DNS  # dns in an event
-            points = None
-            continue  # throw away DNS
         elif False in [result.status ==  # non ok-status in an event
                        "OK" for result in member_results]:
             for result in member_results:
@@ -173,55 +174,31 @@ for event in events:
                 points = 0
                 derivation = Derivation.NW
             else:
-                if races[0].discipline_iddiscipline == "SCO":
+                if races[0].discipline_id == "SCO":
                     if winner["best"][0] == races[0].max_points:
                         if member_results[0].points == races[0].max_points:
-                            points = max(
-                                round(
-                                    MAX_POINTS * (winner["best"][1] / time), 1
-
-                                ), MIN_POINTS,
-                            )  # scaled by time if same points
+                            points = MAX_POINTS * (winner["best"][1] / time)
                         else:
                             slowest_competitor_points = max(
                                 round(
-                                    MAX_POINTS *
-                                    (winner["best"][1] /
-                                     winner["worst"][1]), 1
-
-                                ), MIN_POINTS,
-                            )  # scaled by time if same points
-                            points = max(
-                                round(
-                                    slowest_competitor_points *
-                                    (member_results[0].points / races[0].max_points
-                                     ),
-                                    2),
-                                MIN_POINTS)
+                                    MAX_POINTS * (winner["best"][1] / winner["worst"][1]), 1
+                                ), MIN_POINTS)
+                            points = slowest_competitor_points * \
+                                (member_results[0].points / races[0].max_points)
                     else:
-                        points = max(
-                            round(
-                                MAX_POINTS *
-                                (member_results[0].points / winner["best"][0]),
-                                1,
-                            ), MIN_POINTS,
-                        )
+                        points = MAX_POINTS * \
+                            (member_results[0].points / winner["best"][0])
                 else:
-                    points = max(
-                        round(
-                            MAX_POINTS *
-                            (winner / time),
-                            1,
-                        ),
-                        MIN_POINTS,
-                    )
+                    points = MAX_POINTS * (winner / time)
+                points = max(round(points, 1), MIN_POINTS)
                 if points == MAX_POINTS:
                     derivation = Derivation.WIN
                 if points >= MAX_POINTS:
                     eligibility = session.query(
-                        tables.MemberGrade.eligibility_ideligibility).filter_by(
-                        member_idmember=member).first()
-                    if eligibility.eligibility_ideligibility == "INEL":
+                        tables.MemberGrade.eligibility_id).filter_by(
+                            year=season,
+                        member_id=member).first()
+                    if eligibility.eligibility_id == "INEL":
                         derivation = Derivation.IW
                     else:
                         if points > MAX_POINTS:
@@ -230,37 +207,42 @@ for event in events:
                     derivation = Derivation.OK
 
         session.merge(tables.Points(
-            member_grade_season_year=season,
-            member_grade_member_idmember=member,
-            event_season_idyear=season,
+            year=season,
+            member_id=member,
             event_number=event.number,
-            points_derivation_idpoints_derivation=derivation.name,
+            points_derivation_id=derivation.name,
             points_generated=points,
             counts_towards_total=True
         ))
 
     admins = session.query(
         tables.EventAdmins).filter_by(
-        event_season_idyear=season,
+        year=season,
         event_number=event.number)
     for admin in admins:
-        if session.query(tables.MemberGrade).filter_by(member_idmember=admin.member_idmember).count(
-        ):  # need to test whether admin has competed in oy year yet
+        session.query(tables.Points).filter_by(
+            year=season,
+            event_number=event.number,
+            member_id=admin.member_id
+        ).delete()  # delete competing scores if set the event
+        if session.query(
+                tables.MemberGrade).filter_by(
+                member_id=admin.member_id,
+                year=season).count():  # need to test whether admin has competed in oy year yet
             # if they have not then cannot assign grade, not in competition
 
             session.merge(
                 tables.Points(
-                    member_grade_season_year=season,
-                    member_grade_member_idmember=admin.member_idmember,
-                    event_season_idyear=season,
+                    year=season,
+                    member_id=admin.member_id,
                     event_number=event.number,
-                    points_derivation_idpoints_derivation=admin.admin_roles_idadmin_roles,
+                    points_derivation_id=admin.admin_role_id,
                     points_generated=MAX_POINTS,
                     counts_towards_total=True))
 # assign whether points count towards the total or not.
 
-members = session.query(tables.Member.idmember)
-events = session.query(tables.Event).filter_by(season_idyear=season)
+members = session.query(tables.Member.member_id).filter_by(year=season)
+events = session.query(tables.Event).filter_by(year=season)
 counts_towards_total = {
     1: 1,
     2: 1,
@@ -273,18 +255,18 @@ counts_towards_total = {
 }
 for member in members:
     results = session.query(
-        tables.Points).filter_by(
-        member_grade_member_idmember=member[0]).all()
+        tables.Points).filter_by(year=season,
+                                 member_id=member[0]).all()
     results.sort(key=lambda result: result.points_generated or 0, reverse=True)
     for i, result in enumerate(results):
         if i >= counts_towards_total[events.count()]:
             session.execute(
                 update(
                     tables.Points).where(
-                    tables.Points.member_grade_season_year == result.member_grade_season_year).where(
-                    tables.Points.member_grade_member_idmember == result.member_grade_member_idmember).where(
+                    tables.Points.year == result.year).where(
+                    tables.Points.member_id == result.member_id).where(
                     tables.Points.event_number == result.event_number).where(
-                        tables.Points.points_derivation_idpoints_derivation == result.points_derivation_idpoints_derivation).values(
+                        tables.Points.points_derivation_id == result.points_derivation_id).values(
                             counts_towards_total=False))
 
 
