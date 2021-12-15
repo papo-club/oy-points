@@ -5,32 +5,18 @@ from datetime import date, datetime, timedelta
 from os import path
 from sys import argv, stdin
 from typing import Optional
+from clinput import prompt
 
 from fuzzywuzzy import fuzz, process
 from helpers.connection import commit_and_close, session, tables
+from helpers.args import get_filename, get_season
 
 logging.basicConfig(level=logging.WARNING, format="")
-csv_path = path.join(path.dirname(__file__), "../..", argv[1])
-
+season = get_season()
+filename = get_filename()
 
 LIKELY_MATCH = 0.80
 POSSIBLE_MATCH = 0.75
-
-
-seasons = session.query(tables.Season.year)
-logging.critical("available seasons:")
-for season in seasons:
-    logging.critical(season.year)
-while True:
-    logging.critical("season?")
-    try:
-        season = int(stdin.readline())
-    except ValueError:
-        logging.critical("that is not a valid season.")
-    else:
-        if season in {field.year for field in seasons}:
-            break
-        logging.critical("that is not a valid season.")
 
 
 class _Match(object):
@@ -117,9 +103,9 @@ def _commit_member(member: _Member, competitor: _Competitor) -> None:
     session.merge(
         tables.Result(
             member_id=member.memberid,
-            year=selected_event.year,
-            event_number=selected_event.number,
-            race_number=race_num,
+            year=season,
+            event_number=event_number,
+            race_number=race.number,
             race_grade=competitor.grade,
             time=competitor.time,
             status=competitor.status,
@@ -231,44 +217,19 @@ def _get_matches(competitor: _Competitor, members: list[_Member]) -> None:
         )
 
 
-events = session.query(tables.Event).filter_by(year=season)
+event_number = prompt.List(
+    "event", {f"OY{event.number}": event.number for event in session.query(
+        tables.Event).filter_by(year=season).all()}).prompt()
 
-logging.critical("select event: ")
-for event in events:
-    number = event.number
-    logging.critical(
-        f"OY{event.number}",
-    )
-
-selected_event = None
-while True:
-    logging.critical("event?")
-    event_code = stdin.readline().strip()
-    for event in events:
-        if event_code == str(event.number):
-            selected_event = event
-            break
-    else:
-        logging.critical("that is not a valid event code.")
-        continue
-    break
 
 races = session.query(
     tables.Race).filter_by(
         year=season,
-    event_number=selected_event.number)
+    event_number=event_number)
 
-for race in races:
-    logging.critical(f'{race.number}: {race.map}')
-while True:
-    logging.critical("Race in event?")
-    try:
-        race_num = int(stdin.readline().strip())
-    except BaseException:
-        logging.critical("Not a valid race number.")
-        continue
-    if race_num in [race.number for race in races]:
-        break
+race = prompt.List(
+    "race", {
+        f"{race.number}: {race.map}": race for race in races}).prompt()
 
 
 members = []
@@ -298,7 +259,7 @@ status_codes = {
 
 grades = session.query(tables.Grade)
 
-with open(csv_path, "r") as csvfile:
+with open(filename, "r") as csvfile:
     reader = DictReader(csvfile)
 
     race_grades = {*[(row["Short"], row["Long"]) for row in reader]}
@@ -307,36 +268,27 @@ with open(csv_path, "r") as csvfile:
         for race_grade in race_grades:
             session.merge(
                 tables.RaceGrade(
-                    year=selected_event.year,
-                    event_number=selected_event.number,
-                    race_number=race_num,
+                    year=season,
+                    event_number=event_number,
+                    race_number=race.number,
                     grade_id=race_grade[0],
                     race_grade=race_grade[0]
                 )
             )
     else:
-        logging.critical("Available grades:")
-        for race_grade in race_grades:
-            logging.critical(f"{race_grade[0]}: {race_grade[1]}")
         for grade in grades:
-            while True:
-                logging.critical(f"Match grade for {grade.name}?")
-                selected_grade = stdin.readline().strip()
-                if selected_grade in [race_grade[0]
-                                      for race_grade in race_grades]:
-                    session.merge(
-                        tables.RaceGrade(
-                            year=selected_event.year,
-                            event_number=selected_event.number,
-                            race_number=race_num,
-                            grade_id=grade.grade_id,
-                            race_grade=selected_grade))
-                    break
-                else:
-                    logging.critical("That is not a valid grade.")
+            selected_grade = prompt.List(
+                f"match grade for {grade.name}", {
+                    grade_name: grade_id for grade_id, grade_name in race_grades}).prompt()
+            session.merge(
+                tables.RaceGrade(
+                    year=season,
+                    event_number=event_number,
+                    race_number=race.number,
+                    grade_id=grade.grade_id,
+                    race_grade=selected_grade))
 
-
-with open(csv_path, "r") as csvfile:
+with open(filename, "r") as csvfile:
     reader = DictReader(csvfile)
     for competitor_raw in reader:
         deltatime = None
@@ -357,9 +309,14 @@ with open(csv_path, "r") as csvfile:
             if finish_time and start_time:
                 deltatime = finish_time - start_time
                 if deltatime < timedelta(0, 0, 0):
-                    t = date.time.strptime(competitor_raw["Time"], timeformat)
+                    for timeformat in csv_timeformats:
+                        try:
+                            t = datetime.strptime(
+                                competitor_raw["Time"], timeformat)
+                        except ValueError:
+                            pass
                     deltatime = timedelta(
-                        hours=t.hour, minutes=t.minue, seconds=t.second
+                        hours=t.hour, minutes=t.minute, seconds=t.second
                     )
         else:
             if status_codes[int(competitor_raw["Classifier"])] in ["OK", "MP"]:
