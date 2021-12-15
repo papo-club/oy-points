@@ -14,8 +14,11 @@ from helpers.connection import commit_and_close, session, tables
 from clinput import prompt
 logging.basicConfig(level=logging.INFO, format="")
 
-MAX_POINTS = 25
-MIN_POINTS = 10
+season = get_season()
+season_info = session.query(tables.Season).filter_by(year=season).first()
+MAX_POINTS = season_info.max_points
+MIN_POINTS = season_info.min_points
+MIN_TIME_POINTS = season_info.min_time_points
 
 
 class Eligibility(Enum):
@@ -70,7 +73,6 @@ def _correct_grade(member, result):
     return competitor_grade.first() in valid_grades.all()
 
 
-season = get_season()
 events = session.query(tables.Event).filter_by(year=season)
 members = session.query(tables.Member).filter_by(year=season)
 grades = session.query(tables.Grade)
@@ -324,7 +326,7 @@ for event in events:
                             slowest_competitor_points = max(
                                 round(
                                     MAX_POINTS * (winner["best"][1] / winner["worst"][1]), 1
-                                ), MIN_POINTS)
+                                ), MIN_TIME_POINTS)
                             points = slowest_competitor_points * \
                                 (member_results[0].points / races[0].max_points)
                     else:
@@ -335,7 +337,7 @@ for event in events:
                     # not a score event, scale by time
                     points = MAX_POINTS * (winner / time)
                 # if points < minimum points, set to minimum
-                points = max(round(points, 1), MIN_POINTS)
+                points = max(round(points, 1), MIN_TIME_POINTS)
                 # if competitor received maximum points, set to winner
                 if points == MAX_POINTS:
                     derivation = Derivation.WIN
