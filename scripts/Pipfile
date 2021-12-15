@@ -11,6 +11,7 @@ pytimeparse = "*"
 python-levenshtein = "*"
 sqlalchemy = "*"
 mysqlclient = "*"
+clinput = {path = "/Users/Ryan/Programming/Python/clinput"}
 
 [dev-packages]
 wemake-python-styleguide = "*"
@@ -20,8 +21,7 @@ mypy = "*"
 python_version = "3.9"
 
 [scripts]
-points = "python src/calculate_points.py"
+points = "python src/calculate_grades_and_points.py"
 event = "python src/create_event.py"
 members = "python src/member_import.py"
 results = "python src/result_import.py"
-grades = "python src/calculate_grades.py"

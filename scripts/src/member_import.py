@@ -1,13 +1,15 @@
 import logging
+from clinput import prompt
 import sys
 from csv import DictReader
 from os import path
 from sys import stdin
 
 from helpers.connection import commit_and_close, tables, session
+from helpers.args import get_filename, get_season
 
 logging.basicConfig(level=logging.INFO, format="")
-csv_path = path.join(path.dirname(__file__), "../..", sys.argv[1])
+season = get_season()
 
 fieldname_mapper = {
     "member_id": "ONZ ID",
@@ -17,22 +19,7 @@ fieldname_mapper = {
     "gender": "Gender",
 }
 
-seasons = session.query(tables.Season.year)
-logging.info("available seasons:")
-for season in seasons:
-    logging.info(season.year)
-while True:
-    logging.info("season?")
-    try:
-        season = int(stdin.readline())
-    except ValueError:
-        logging.info("that is not a valid season.")
-    else:
-        if season in {field.year for field in seasons}:
-            break
-        logging.info("that is not a valid season.")
-
-with open(csv_path, "r") as members_csv:
+with open(get_filename(), "r") as members_csv:
     for row in DictReader(members_csv):
         logging.info("adding member "
                      f"{row['First name']} {row['Last name']}",
