@@ -1,17 +1,14 @@
-from helpers.connection import commit_and_close, tables, session
-from collections import Counter
-from datetime import date
-from sqlalchemy import exc as sa_exc
-import warnings
-from helpers.args import get_season
 import logging
-from datetime import timedelta
+from collections import Counter
+from datetime import date, timedelta
 from enum import Enum
-from sys import stdin
+from statistics import mean
 
-from sqlalchemy import update, asc
+from sqlalchemy import update
+
+from helpers.args import get_season
 from helpers.connection import commit_and_close, session, tables
-from clinput import prompt
+
 logging.basicConfig(level=logging.INFO, format="")
 
 season = get_season()
@@ -41,6 +38,13 @@ class Derivation(Enum):
     PLAN = "Planner"
     WG = "Wrong grade"
     WIN = "Winner"
+    UP = "Up a grade"
+
+
+class Grade(Enum):
+    UP = 2
+    CORRECT = 1
+    WRONG = 0
 
 
 counts_towards_total = {
@@ -57,21 +61,34 @@ counts_towards_total = {
 
 def _get_grade(competitor):
     return session.query(
-        tables.MemberGrade.grade_id).filter_by(
+        tables.MemberGrade).filter_by(
         member_id=competitor,
         year=season)
 
 
 def _correct_grade(member, result):
-    valid_grades = session.query(
-        tables.RaceGrade.grade_id).filter_by(
+    valid_grades = session.query(tables.RaceGrade).filter_by(
         year=season,
         event_number=result.event_number,
         race_number=result.race_number,
         race_grade=result.race_grade)
-    competitor_grade = _get_grade(member)
-    return competitor_grade.first() in valid_grades.all()
+    competitor_grade = _get_grade(member).first().grade_id
+    if competitor_grade in [
+            grade.grade_id for grade in valid_grades]:
+        return Grade.CORRECT
+    else:
+        competitor_grade_difficulty = session.query(
+            tables.Grade).filter_by(
+            grade_id=competitor_grade).first().difficulty
+        result_grade_difficulty = mean([session.query(tables.Grade).filter_by(
+            grade_id=grade.grade_id).first().difficulty for grade in valid_grades])
+        if result_grade_difficulty > competitor_grade_difficulty:
+            return Grade.UP
+        return Grade.WRONG
 
+
+session.query(tables.Points).delete()
+session.query(tables.MemberGrade).delete()
 
 events = session.query(tables.Event).filter_by(year=season)
 members = session.query(tables.Member).filter_by(year=season)
@@ -209,6 +226,9 @@ for event in events:
                 # if the competitors points equal the max points
                 # set best and worst times accordingly
                 if score_result.points == score_race.max_points:
+                    # if max points score has not yet been set, reset best time
+                    if best_points < score_race.max_points:
+                        best_time = timedelta(1, 0, 0)
                     best_points = score_race.max_points
                     if score_result_time < best_time:
                         best_time = score_result_time
@@ -252,111 +272,126 @@ for event in events:
             tables.Result).filter_by(
             year=season,
             event_number=event.number,
-            member_id=member).filter(
-            tables.Result.status != "NT").filter(
-                tables.Result.status != "DNS")
+            member_id=member)
 
         member_results = []
         for race in races:
-            existing_member_results = [
-                res for res in member_results if res.race_number == race.number
-            ]
-            for result in all_member_results:
-                # check:
-                # add all results for races where grade is correct, making sure
-                # a result for this race has not already been processed (in the
-                # case of multiple results for 1 race)
-                # in this case, the first result found with a valid grade is
-                # used
-                if result.race_number == race.number and _correct_grade(
-                        member, result) and not len(existing_member_results):
-                    member_results.append(result)
-        # check that member competed in any races - if not must be a DNS or NT
-        if all_member_results.count() == 0:
+            # get member results for this race
+            member_race_results = all_member_results.filter_by(
+                race_number=race.number)
+            # if there are results
+            if member_race_results.count():
+                # choose first result in correct grade
+                result = [
+                    result for result in member_race_results.all() if _correct_grade(
+                        member, result) == Grade.CORRECT]
+                if not result:
+                    result = [
+                        result for result in member_race_results.all() if _correct_grade(
+                            member, result) == Grade.UP]
+                if not result:
+                    # if still no result choose first wrong grade result
+                    result = member_race_results.all()
+                member_results.append(result[0])
+        if not member_results:
+            raise Exception()
+        competed_results = [
+            result.status not in (
+                "NT", "DNS") for result in member_results]
+        # no results
+        if True not in competed_results:
             points = 0
-            if "NT" in [result.status for result in session.query(
-                    tables.Result).filter_by(
-                    year=season,
-                    event_number=event.number,
-                    member_id=member)]:
+            if "NT" in [result.status for result in member_results]:
                 derivation = Derivation.NT
             else:
                 derivation = Derivation.DNS
         # check that member competed at least 1 race
-        elif len({*[result.race_number
-                    for result in all_member_results]}) < races.count():
+        elif False in competed_results or len(member_results) < races.count():
             derivation = Derivation.NA
             points = MIN_POINTS
-        # check that member competed in all races in correct grade
-        elif len({*[result.race_number
-                    for result in member_results]}) < races.count():
-            derivation = Derivation.WG  # wrong grade in an event
-            points = MIN_POINTS
-        # check that member got OK status for all races in correct grade
+        # check that member got OK status for all races
         elif False in [result.status ==
                        "OK" for result in member_results]:
             for result in member_results:
                 if result.status != "OK":
                     derivation = getattr(Derivation, result.status)
                     points = MIN_POINTS
-        # everything ok
+        # check that member competed in all races in correct grade
         else:
-            try:
-                # get winner
-                winner = winners[_get_grade(member).first()[0]]
-                time = timedelta(0, sum([
-                    result.time for result in member_results if result.time
-                ]), 0)
-            except KeyError:
-                # no winner
-                points = 0
-                derivation = Derivation.NW
+            for result in member_results:
+                if not (
+                    grade_status := _correct_grade(
+                        member,
+                        result)) == Grade.CORRECT:
+                    if grade_status == Grade.UP:
+                        derivation = Derivation.UP
+                        points = MIN_TIME_POINTS
+                        break
+                    else:
+                        derivation = Derivation.WG
+                        points = MIN_POINTS
+                        break
             else:
-                if is_score:
-                    member_result = member_results[0]
-                    # if max points was reached
-                    if winner["best"][0] == score_race.max_points:
-                        if member_result.points == score_race.max_points:
-                            # if this competitor also reached max points scale
-                            # by time
-                            points = MAX_POINTS * (winner["best"][1] / time)
+                try:
+                    # get winner
+                    winner = winners[_get_grade(member).first().grade_id]
+                    time = timedelta(0, sum([
+                        result.time for result in member_results if result.time
+                    ]), 0)
+                except KeyError:
+                    # no winner
+                    points = 0
+                    derivation = Derivation.NW
+                else:
+                    if is_score:
+                        member_result = member_results[0]
+                        # if max points was reached
+                        if winner["best"][0] == score_race.max_points:
+                            if member_result.points == score_race.max_points:
+                                # if this competitor also reached max points scale
+                                # by time
+                                points = MAX_POINTS * \
+                                    (winner["best"][1] / time)
+                            else:
+                                # competitor did not reach max points
+                                # scale by slowest competitor time * points
+                                slowest_competitor_points = max(
+                                    round(
+                                        MAX_POINTS * (winner["best"][1] /
+                                                      winner["worst"][1]), 1
+                                    ), MIN_TIME_POINTS)
+                                points = slowest_competitor_points * \
+                                    (member_results[0].points / races[0].max_points)
                         else:
-                            # competitor did not reach max points
-                            # scale by slowest competitor time * points
-                            slowest_competitor_points = max(
-                                round(
-                                    MAX_POINTS * (winner["best"][1] / winner["worst"][1]), 1
-                                ), MIN_TIME_POINTS)
-                            points = slowest_competitor_points * \
-                                (member_results[0].points / races[0].max_points)
+                            # max points not reached in this score, scale by
+                            # points
+                            points = MAX_POINTS * \
+                                (member_results[0].points / winner["best"][0])
                     else:
-                        # max points not reached in this score, scale by points
-                        points = MAX_POINTS * \
-                            (member_results[0].points / winner["best"][0])
-                else:
-                    # not a score event, scale by time
-                    points = MAX_POINTS * (winner / time)
-                # if points < minimum points, set to minimum
-                points = max(round(points, 1), MIN_TIME_POINTS)
-                # if competitor received maximum points, set to winner
-                if points == MAX_POINTS:
-                    derivation = Derivation.WIN
-                # if competitor recieved more than maximum points
-                if points >= MAX_POINTS:
-                    # check eligibility of competitor
-                    eligibility = session.query(
-                        tables.MemberGrade.eligibility_id).filter_by(
-                            year=season,
-                        member_id=member).first()
-                    if eligibility.eligibility_id == "INEL":
-                        # inelegibile win
-                        derivation = Derivation.IW
+                        # not a score event, scale by time
+                        points = MAX_POINTS * (winner / time)
+                    # if points < minimum points, set to minimum
+                    points = max(round(points, 1), MIN_TIME_POINTS)
+                    # if competitor received maximum points, set to winner
+                    if points == MAX_POINTS:
+                        derivation = Derivation.WIN
+                    # if competitor recieved more than maximum points
+                    if points >= MAX_POINTS:
+                        # check eligibility of competitor
+                        eligibility = session.query(
+                            tables.MemberGrade.eligibility_id).filter_by(
+                                year=season,
+                            member_id=member).first()
+                        if eligibility.eligibility_id == "INEL":
+                            # inelegibile win
+                            derivation = Derivation.IW
+                        else:
+                            # something went wrong if competitor is
+                            # eligible
+                            if points > MAX_POINTS:
+                                raise Exception("Maximum points exceeded")
                     else:
-                        # something went wrong if competitor is eligible
-                        if points > MAX_POINTS:
-                            raise Exception("Maximum points exceeded")
-                else:
-                    derivation = Derivation.OK
+                        derivation = Derivation.OK
 
         # add points
         session.merge(tables.Points(
