@@ -87,8 +87,8 @@ def _correct_grade(member, result):
         return Grade.WRONG
 
 
-session.query(tables.Points).delete()
-session.query(tables.MemberGrade).delete()
+session.query(tables.Points).filter_by(year=season).delete()
+session.query(tables.MemberGrade).filter_by(year=season).delete()
 
 events = session.query(tables.Event).filter_by(year=season)
 members = session.query(tables.Member).filter_by(year=season)

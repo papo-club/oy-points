@@ -65,6 +65,7 @@ const getDerivation = () => {
         for (row of rows) {
           derivation[row.points_derivation_id] = {
             name: row.type,
+            points: row.points,
             description: row.description,
           };
         }
@@ -74,7 +75,7 @@ const getDerivation = () => {
   });
 };
 
-const getGrades = (season) => {
+const getGrades = () => {
   return new Promise((resolve, reject) => {
     connection.query(`SELECT * FROM oypoints.grade`, (err, rows, fields) => {
       if (err) throw err;
@@ -173,41 +174,82 @@ const getMemberGradeAndEligibility = (id, season) => {
   });
 };
 
+const getSeasons = (season) => {
+  return new Promise((resolve, reject) => {
+    if (season) {
+      connection.query(
+        `SELECT * from oypoints.season WHERE year=${season}`,
+        (err, rows, fields) => {
+          if (rows.length) {
+            let row = rows[0];
+            resolve({
+              MAX_POINTS: row.max_points,
+              MIN_POINTS: row.min_points,
+              MIN_TIME_POINTS: row.min_time_points,
+              provisional: row.provisional,
+            });
+          } else {
+            resolve(null);
+          }
+        }
+      );
+    } else {
+      connection.query(`SELECT * from oypoints.season`, (err, rows, fields) => {
+        if (err) throw err;
+        seasons = {};
+        for (row of rows) {
+          seasons[row.year] = {
+            MAX_POINTS: row.max_points,
+            MIN_POINTS: row.min_points,
+            MIN_TIME_POINTS: row.min_time_points,
+            provisional: row.provisional,
+          };
+        }
+        resolve(seasons);
+      });
+    }
+  });
+};
+
 app.get("/", (req, res) => {
   res.send("API Home");
 });
 
-app.get("/members", (req, res) => {
-  getMembers("2021").then((members) => res.send(members));
+app.get("/seasons/:year?", (req, res) => {
+  getSeasons(req.params.year).then((seasons) => res.send(seasons));
+});
+
+app.get("/members/:year", (req, res) => {
+  getMembers(req.params.year).then((members) => res.send(members));
 });
 
 app.get("/grades", (req, res) => {
-  getGrades("2021").then((grades) => res.send(grades));
+  getGrades().then((grades) => res.send(grades));
 });
 
-app.get("/events", (req, res) => {
-  getEvents("2021").then((events) => res.send(events));
+app.get("/events/:year", (req, res) => {
+  getEvents(req.params.year).then((events) => res.send(events));
 });
 
-app.get("/eligibility", (req, res) => {
-  getEligibility().then((eligibility) => res.send(eligibility));
+app.get("/eligibility/:year", (req, res) => {
+  getEligibility(req.params.year).then((eligibility) => res.send(eligibility));
 });
 
-app.get("/derivation", (req, res) => {
-  getDerivation().then((derivation) => res.send(derivation));
+app.get("/derivation/:year", (req, res) => {
+  getDerivation(req.params.year).then((derivation) => res.send(derivation));
 });
 
-app.get("/points", (req, res) => {
-  getGrades("2021")
+app.get("/points/:year", (req, res) => {
+  getGrades(req.params.year)
     .then((grades) => {
       return Object.fromEntries(
         Object.keys(grades).map((grade) => [grade, {}])
       );
     })
     .then((return_result) => {
-      getMembers("2021").then((members) => {
+      getMembers(req.params.year).then((members) => {
         let membersWithGrades = Object.entries(members).map(([id, member]) => {
-          return getMemberGradeAndEligibility(id, "2021").then(
+          return getMemberGradeAndEligibility(id, req.params.year).then(
             (memberStatus) => {
               if (memberStatus) {
                 return_result[memberStatus["grade"]][id] = {
@@ -221,14 +263,14 @@ app.get("/points", (req, res) => {
           );
         });
         Promise.all(membersWithGrades)
-          .then(() => getPoints("2021"))
+          .then(() => getPoints(req.params.year))
           .then((points) => {
             Promise.all(
               points.map((point) => {
-                return getEvent("2021", point.event).then((_event) => {
+                return getEvent(req.params.year, point.event).then((_event) => {
                   return getMemberGradeAndEligibility(
                     point.member,
-                    "2021"
+                    req.params.year
                   ).then((memberStatus) => {
                     if (return_result[memberStatus["grade"]][point.member]) {
                       return_result[memberStatus["grade"]][
