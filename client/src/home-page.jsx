@@ -39,32 +39,34 @@ const HomePage = ({ seasons }) => {
 
   if (!points || !grades) return "Loading...";
   return (
-    <div className="">
+    <div className="max-w-screen-md m-auto">
       {points
         .sort(([yeara], [yearb]) => yearb - yeara)
         .map(([year, season, points]) => (
-          <div className="bg-gray-100 w- flex flex-col items-stretch p-4">
-            <Link to={`/${year}`}>
-              <button className="bg-gradient-to-b from-red-400 to-red-600 h-20 border-4 border-red-600 rounded-md w-full text-white font-title font-bold text-2xl">
-                {year}
-                <FontAwesomeIcon icon={faChevronRight} className="ml-4" />
-              </button>
-            </Link>
-            <table className="mt-4">
+          <div className="bg-gray-100 sm:m-10 flex flex-col items-stretch p-4">
+            <h1 className="text-8xl p-3 font-title hover:bg-gray-200">
+              <Link to={`/${year}`}>{year}</Link>
+            </h1>
+            <table className="mt-4 text-left">
               <thead>
-                <th className="font-bold text-2xl font-title">Grade</th>
-                <th className="font-bold text-2xl font-title">
+                <th className="font-bold text-lg sm:text-2xl font-title">
+                  Grade
+                </th>
+                <th className="font-bold text-lg sm:text-2xl font-title">
                   {season.provisional ? "Current Winner" : "Winner"}
                 </th>
               </thead>
               {Object.entries(points).map(([idgrade, competitors]) => {
                 return (
-                  <tr>
+                  <Link
+                    to={`/${year}/${idgrade}`}
+                    className="table-row hover:bg-gray-200 border-t"
+                  >
                     <td className="p-1">{grades[idgrade].name}</td>
                     <td className={season.provisional && "italic"}>
                       {getWinner(competitors)}
                     </td>
-                  </tr>
+                  </Link>
                 );
               })}
             </table>
