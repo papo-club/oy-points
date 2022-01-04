@@ -9,7 +9,7 @@ const ResultsPage = () => {
   const [eligibility, setEligibility] = useState(null);
   const [derivation, setDerivation] = useState(null);
   const [receivedResponse, setReceivedResponse] = useState(false);
-  const { year } = useParams();
+  const { year, grade } = useParams();
   const derivationColors = {
     WIN: "bg-green-100",
     PLAN: "bg-yellow-100",
@@ -18,7 +18,6 @@ const ResultsPage = () => {
   useEffect(() => {
     const api = "http://localhost:9000/";
     const endpoints = [
-      ["points", setPoints],
       ["seasons", setSeasons],
       ["events", setEvents],
       ["eligibility", setEligibility],
@@ -29,16 +28,21 @@ const ResultsPage = () => {
         .then((res) => res.json())
         .then(setter);
     });
-    Promise.resolve(
+    promises.push(
+      fetch(api + "points" + "/" + (grade ? year + "/" + grade : year))
+        .then((res) => res.json())
+        .then((points) => (grade ? { [grade]: points } : points))
+        .then(setPoints)
+    );
+    promises.push(
       fetch(api + "grades")
         .then((res) => res.json())
         .then(setGrades)
     );
     Promise.all(promises).then(() => setReceivedResponse(true));
-  }, [year]);
+  }, [year, grade]);
 
   const content = (receivedResponse) => {
-    console.log(receivedResponse);
     switch (receivedResponse) {
       case true:
         return (

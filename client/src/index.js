@@ -27,7 +27,9 @@ const App = () => {
           <Routes>
             <Route path="/">
               <Route index element={<HomePage seasons={seasons} />} />
-              <Route path=":year" element={<ResultsPage />} />
+              <Route path=":year" element={<ResultsPage />}>
+                <Route path=":grade" element={<ResultsPage />} />
+              </Route>
             </Route>
           </Routes>
         </Router>

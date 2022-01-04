@@ -239,7 +239,7 @@ app.get("/derivation/:year", (req, res) => {
   getDerivation(req.params.year).then((derivation) => res.send(derivation));
 });
 
-app.get("/points/:year", (req, res) => {
+app.get("/points/:year/:grade?", (req, res) => {
   getGrades(req.params.year)
     .then((grades) => {
       return Object.fromEntries(
@@ -301,7 +301,13 @@ app.get("/points/:year", (req, res) => {
                   })
                 );
               })
-              .then(() => res.send(return_result));
+              .then(() => {
+                if (req.params.grade) {
+                  res.send(return_result[req.params.grade]);
+                } else {
+                  res.send(return_result);
+                }
+              });
           });
       });
     });
