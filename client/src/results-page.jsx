@@ -11,9 +11,9 @@ const ResultsPage = () => {
   const [receivedResponse, setReceivedResponse] = useState(false);
   const { year } = useParams();
   const derivationColors = {
-    WIN: "table-success",
-    PLAN: "table-warning",
-    CTRL: "table-warning",
+    WIN: "bg-green-100",
+    PLAN: "bg-yellow-100",
+    CTRL: "bg-yellow-100",
   };
   useEffect(() => {
     const api = "http://localhost:9000/";
@@ -77,24 +77,26 @@ const ResultsPage = () => {
               )
               .map(([grade, competitors]) => (
                 <>
-                  <br />
-                  <br />
-                  <br />
-                  <h1>{grades[grade].name}</h1>
-                  <table>
-                    <thead className="thead-light">
-                      <th>Place</th>
-                      <th>Competitor</th>
+                  <h1 className="font-title font-bold text-4xl">
+                    {grades[grade].name}
+                  </h1>
+                  <table className="table-auto w-full">
+                    <thead>
+                      <th className="w-14">Place</th>
+                      <th className="w-72">Competitor</th>
                       {Object.entries(events).map(([idevent, event_]) => (
-                        <th style={{ width: "10%" }}>
-                          OY{idevent}
-                          <br />
-                          {event_.name}
-                          <br />
-                          {event_.discipline}
+                        <th className="-rotate-45 w-20">
+                          <div className="whitespace-nowrap h-12 translate-y-10  translate-x-24 w-0">
+                            <span className="text-left">
+                              OY{idevent} {event_.name} <br />
+                              <span className="border-b">
+                                {event_.discipline}
+                              </span>
+                            </span>
+                          </div>
                         </th>
                       ))}
-                      <th>Total /{25 * 5}</th>
+                      <th className="w-14">Total /{25 * 5}</th>
                     </thead>
                     <tbody>
                       {console.log()}
@@ -108,7 +110,7 @@ const ResultsPage = () => {
                         .map(([idcompetitor, competitor], place) => (
                           <tr>
                             <th
-                              className={`table-active ${
+                              className={` ${
                                 competitor.qualified !== "INEL"
                                   ? "fw-bold"
                                   : "text-muted fst-italic"
@@ -119,7 +121,7 @@ const ResultsPage = () => {
                                 : `(${place + 1})`}
                             </th>
                             <th
-                              className={`table-active ${
+                              className={` ${
                                 competitor.qualified !== "INEL" || "text-muted"
                               }`}
                             >
@@ -136,10 +138,10 @@ const ResultsPage = () => {
                                   competitor.qualified !== "INEL"
                                     ? derivationColors[
                                         competitor.results[idevent]?.derivation
-                                      ] + " fw-bold"
+                                      ] + " fw-bold border"
                                     : derivationColors[
                                         competitor.results[idevent]?.derivation
-                                      ] + " text-muted"
+                                      ] + " text-muted border"
                                 }
                               >
                                 {competitor.results[idevent]?.points}
@@ -147,15 +149,15 @@ const ResultsPage = () => {
                                 {competitor.results[idevent]?.derivation}
                               </td>
                             ))}
-                            <td
-                              className={`table-active ${
+                            <th
+                              className={
                                 competitor.qualified !== "INEL"
-                                  ? "fw-bold"
-                                  : "text-muted"
-                              }`}
+                                  ? "font-bold"
+                                  : "gray-300"
+                              }
                             >
                               {competitor.totalPoints}
-                            </td>
+                            </th>
                           </tr>
                         ))}
                     </tbody>
