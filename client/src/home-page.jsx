@@ -39,7 +39,7 @@ const HomePage = ({ seasons }) => {
 
   if (!points || !grades) return "Loading...";
   return (
-    <div className="grid gap-5 grid-flow-col max-w-screen-lg m-auto">
+    <div className="">
       {points
         .sort(([yeara], [yearb]) => yearb - yeara)
         .map(([year, season, points]) => (
