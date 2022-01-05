@@ -15,6 +15,7 @@ const ResultsPage = () => {
     PLAN: "bg-yellow-100",
     CTRL: "bg-yellow-100",
   };
+
   useEffect(() => {
     const api = "http://localhost:9000/";
     const endpoints = [
@@ -47,7 +48,7 @@ const ResultsPage = () => {
       case true:
         return (
           <>
-            <h2>Points derivation legend</h2>
+            {/* <h2>Points derivation legend</h2>
             <table>
               <thead className="thead-light">
                 <th>Code</th>
@@ -73,100 +74,144 @@ const ResultsPage = () => {
                   )
                 )}
               </tbody>
-            </table>
+            </table> */}
             {Object.entries(points)
               .sort(
                 ([gradea], [gradeb]) =>
                   grades[gradeb].difficulty - grades[gradea].difficulty
               )
               .map(([grade, competitors]) => (
-                <>
-                  <h1 className="font-title font-bold text-4xl">
-                    {grades[grade].name}
-                  </h1>
-                  <table className="table-auto w-full">
-                    <thead>
-                      <th className="w-14">Place</th>
-                      <th className="w-72">Competitor</th>
-                      {Object.entries(events).map(([idevent, event_]) => (
-                        <th className="-rotate-45 w-20">
-                          <div className="whitespace-nowrap h-12 translate-y-10  translate-x-24 w-0">
-                            <span className="text-left">
-                              OY{idevent} {event_.name} <br />
-                              <span className="border-b">
-                                {event_.discipline}
-                              </span>
-                            </span>
-                          </div>
+                <div className="flex flex-col max-w-screen-xl px-5 m-auto my-10">
+                  <div className="self-center lg:self-start">
+                    <h1 className="hidden lg:inline font-title text-5xl">
+                      {grades[grade].name
+                        .split(" ")
+                        .splice(0, grades[grade].name.split(" ").length - 1)
+                        .join(" ")}
+                      <br />
+                      {grades[grade].name.split(" ").splice(-1)}
+                    </h1>
+                    <h1 className="inline lg:hidden font-title text-3xl sm:text-4xl">
+                      {grades[grade].name}
+                    </h1>
+                  </div>
+                  <div className="mt-5 relative overflow-auto lg:overflow-visible whitespace-nowrap">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <th className="sticky w-2 text-right border-b">
+                          {season.provisional ? "Current Placing" : "Place"}
                         </th>
-                      ))}
-                      <th className="w-14">Total /{25 * 5}</th>
-                    </thead>
-                    <tbody>
-                      {console.log()}
-                      {Object.entries(competitors)
-                        .sort(
-                          ([, a], [, b]) =>
-                            (b.qualified !== "INEL") -
-                              (a.qualified !== "INEL") ||
-                            b.totalPoints - a.totalPoints
-                        )
-                        .map(([idcompetitor, competitor], place) => (
-                          <tr>
-                            <th
-                              className={` ${
-                                competitor.qualified !== "INEL"
-                                  ? "fw-bold"
-                                  : "text-muted fst-italic"
-                              }`}
-                            >
-                              {competitor.qualified !== "INEL"
-                                ? place + 1
-                                : `(${place + 1})`}
-                            </th>
-                            <th
-                              className={` ${
-                                competitor.qualified !== "INEL" || "text-muted"
-                              }`}
-                            >
-                              <div>{`${competitor.firstName} ${competitor.lastName}`}</div>
-                              <div>
-                                {eligibility[competitor.qualified].name}
+                        <th className="sticky w-40 text-left pl-4 border-b">
+                          Competitor
+                        </th>
+                        {Object.entries(events).map(([idevent, event_]) => (
+                          <>
+                            <th className="hidden lg:table-cell relative whitespace-nowrap rotated-header">
+                              <div className="absolute bottom-0 left-0 text-left w-full">
+                                <div className="absolute bottom-0 left-0 border-b overflow-hidden text-ellipsis">
+                                  OY{idevent} - {event_.name}
+                                </div>
                               </div>
                             </th>
-                            {Object.entries(events).map(([idevent, event_]) => (
-                              <td
-                                className={
-                                  competitor.results[idevent]
-                                    ?.countsTowardsTotal &&
+                            <th className="lg:hidden">OY{idevent}</th>
+                          </>
+                        ))}
+                        <th className="sticky w-20 text-right pr-3">Points</th>
+                        <th className="border-b sticky w-20 text-right pr-3">
+                          {season.provisional ? "Projected Avg" : "Performance"}
+                        </th>
+                      </thead>
+                      <tbody>
+                        {console.log()}
+                        {Object.entries(competitors)
+                          .sort(
+                            ([, a], [, b]) =>
+                              (b.qualified !== "INEL") -
+                                (a.qualified !== "INEL") ||
+                              (season.provisional
+                                ? b.projectedAvg - a.projectedAvg
+                                : b.totalPoints - a.totalPoints)
+                          )
+                          .map(([idcompetitor, competitor], place) => (
+                            <tr className="odd:bg-white even:bg-gray-50">
+                              <th
+                                className={`sticky text-2xl sm:text-4xl text-right font-title ${
                                   competitor.qualified !== "INEL"
-                                    ? derivationColors[
-                                        competitor.results[idevent]?.derivation
-                                      ] + " fw-bold border"
-                                    : derivationColors[
-                                        competitor.results[idevent]?.derivation
-                                      ] + " text-muted border"
+                                    ? "font-bold"
+                                    : "font-normal italic text-gray-400"
+                                }`}
+                              >
+                                {competitor.qualified !== "INEL"
+                                  ? place + 1
+                                  : `(${place + 1})`}
+                              </th>
+                              <th
+                                className={`sticky pl-4 text-sm sm:text-base font-title text-left ${
+                                  competitor.qualified !== "INEL" ||
+                                  "text-gray-400"
+                                }`}
+                              >
+                                <div>{`${competitor.firstName} ${competitor.lastName}`}</div>
+                                <div>
+                                  {eligibility[competitor.qualified].name}
+                                </div>
+                              </th>
+                              {Object.entries(events).map(
+                                ([idevent, event_]) => (
+                                  <td
+                                    className={
+                                      "min-w-20 w-20 border-r border-t p-2 " +
+                                      (competitor.results[idevent]
+                                        ?.countsTowardsTotal &&
+                                      competitor.qualified !== "INEL"
+                                        ? derivationColors[
+                                            competitor.results[idevent]
+                                              ?.derivation
+                                          ]
+                                        : "text-gray-400 italic")
+                                    }
+                                  >
+                                    <div className="text-2xl font-bold font-title">
+                                      {competitor.results[idevent]?.points}
+                                    </div>
+                                    <div className="-my-1 text-sm ">
+                                      {competitor.results[idevent]?.derivation}
+                                    </div>
+                                  </td>
+                                )
+                              )}
+                              <th
+                                className={
+                                  "sticky text-2xl border-t min-w-24 sm:text-4xl text-right pr-3 font-title " +
+                                  (competitor.qualified !== "INEL"
+                                    ? "font-bold"
+                                    : "font-normal italic text-gray-400")
                                 }
                               >
-                                {competitor.results[idevent]?.points}
-                                <br />
-                                {competitor.results[idevent]?.derivation}
-                              </td>
-                            ))}
-                            <th
-                              className={
-                                competitor.qualified !== "INEL"
-                                  ? "font-bold"
-                                  : "gray-300"
-                              }
-                            >
-                              {competitor.totalPoints}
-                            </th>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </>
+                                {competitor.totalPoints}
+                              </th>
+                              <th
+                                className={
+                                  "sticky text-xl sm:text-3xl text-right pr-3 font-title " +
+                                  (competitor.qualified !== "INEL"
+                                    ? "font-bold"
+                                    : "font-normal italic text-gray-400")
+                                }
+                              >
+                                {season.provisional
+                                  ? competitor.projectedAvg
+                                  : (
+                                      (competitor.totalPoints * 100) /
+                                      (season.MAX_POINTS *
+                                        season.numEventsCount)
+                                    ).toFixed(0) + "%"}
+                              </th>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               ))}
           </>
         );

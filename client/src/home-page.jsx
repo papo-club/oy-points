@@ -25,13 +25,17 @@ const HomePage = ({ seasons }) => {
     );
   }, [seasons]);
 
-  const getWinner = (competitors) => {
+  const getWinner = (season, competitors) => {
     const winner = Object.values(competitors)
       .sort(
-        (competitora, competitorb) =>
-          competitora.totalPoints - competitorb.totalPoints
+        (a, b) =>
+          (a.qualified !== "INEL") - (b.qualified !== "INEL") ||
+          (season.provisional
+            ? a.projectedAvg - b.projectedAvg
+            : a.totalPoints - b.totalPoints)
       )
       .pop();
+    console.log(winner);
     return winner && winner.qualified !== "INEL"
       ? `${winner.firstName} ${winner.lastName}`
       : undefined;
@@ -40,6 +44,15 @@ const HomePage = ({ seasons }) => {
   if (!points || !grades) return "Loading...";
   return (
     <div className="max-w-screen-md m-auto">
+      <div className="sm:m-10 p-4 flex flex-row items-center">
+        <img
+          src="https://papo.org.nz/themes/papo/images/papo-text-logo.png"
+          className="w-20 sm:w-40"
+        />
+        <h1 className="text-3xl sm:text-6xl pl-4 sm:pl-12 font-title font-bold text-red-700">
+          OY Points
+        </h1>
+      </div>
       {points
         .sort(([yeara], [yearb]) => yearb - yeara)
         .map(([year, season, points]) => (
@@ -64,7 +77,7 @@ const HomePage = ({ seasons }) => {
                   >
                     <td className="p-1">{grades[idgrade].name}</td>
                     <td className={season.provisional && "italic"}>
-                      {getWinner(competitors)}
+                      {getWinner(season, competitors)}
                     </td>
                   </Link>
                 );
