@@ -16,7 +16,7 @@ var connection = mysql.createConnection({
 connection.connect();
 
 const MIN_EVENTS_TO_QUALIFY = 3;
-const BEST_X_SCORES = 4;
+const BEST_X_SCORES = 5;
 
 const getMembers = (season) => {
   return new Promise((resolve, reject) => {
@@ -175,6 +175,16 @@ const getMemberGradeAndEligibility = (id, season) => {
 };
 
 const getSeasons = (season) => {
+  const countsTowardsTotal = {
+    1: 1,
+    2: 1,
+    3: 2,
+    4: 3,
+    5: 4,
+    6: 4,
+    7: 5,
+    8: 5,
+  };
   return new Promise((resolve, reject) => {
     if (season) {
       connection.query(
@@ -186,6 +196,8 @@ const getSeasons = (season) => {
               MAX_POINTS: row.max_points,
               MIN_POINTS: row.min_points,
               MIN_TIME_POINTS: row.min_time_points,
+              numEvents: row.num_events,
+              numEventsCount: countsTowardsTotal[row.num_events],
               provisional: row.provisional,
             });
           } else {
@@ -202,6 +214,8 @@ const getSeasons = (season) => {
             MAX_POINTS: row.max_points,
             MIN_POINTS: row.min_points,
             MIN_TIME_POINTS: row.min_time_points,
+            numEvents: row.num_events,
+            numEventsCount: countsTowardsTotal[row.num_events],
             provisional: row.provisional,
           };
         }
@@ -263,8 +277,14 @@ app.get("/points/:year/:grade?", (req, res) => {
           );
         });
         Promise.all(membersWithGrades)
-          .then(() => getPoints(req.params.year))
-          .then((points) => {
+          .then(() =>
+            Promise.all([
+              getSeasons(req.params.year),
+              getPoints(req.params.year),
+              getEvents(req.params.year),
+            ])
+          )
+          .then(([season, points, events]) => {
             Promise.all(
               points.map((point) => {
                 return getEvent(req.params.year, point.event).then((_event) => {
@@ -286,18 +306,30 @@ app.get("/points/:year/:grade?", (req, res) => {
               })
             )
               .then(() => {
+                eventsToGo = Object.entries(events).filter(
+                  ([idevent, _event]) => _event.date > new Date()
+                ).length;
                 Object.entries(return_result).map(([grade_id, members]) =>
                   Object.entries(members).map(([member_id, member]) => {
-                    const totalPoints = Object.entries(member.results).reduce(
-                      (acc, [idevent, _event]) =>
+                    let [totalPoints, eventsCompeted] = Object.entries(
+                      member.results
+                    ).reduce(
+                      ([points, number], [idevent, _event]) =>
                         return_result[grade_id][member_id].results[idevent]
                           .countsTowardsTotal
-                          ? acc + _event.points
-                          : acc,
-                      0
+                          ? [points + _event.points, number + 1]
+                          : [points, number],
+                      [0, 0]
                     );
                     return_result[grade_id][member_id].totalPoints =
                       +totalPoints.toFixed(2);
+                    return_result[grade_id][member_id].projectedAvg = +(
+                      (totalPoints / eventsCompeted) *
+                      Math.min(
+                        eventsCompeted + eventsToGo,
+                        season.numEventsCount
+                      )
+                    ).toFixed(1);
                   })
                 );
               })

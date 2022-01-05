@@ -38,5 +38,5 @@ def get_season() -> int:
 def get_filename() -> str:
     args = _parse_args()
     if args.filename:
-        return path.join(path.dirname(__file__), "../..", args.filename)
+        return path.join(path.dirname(__file__), "../../../", args.filename)
     raise Exception("No file name given, no data to process!")
