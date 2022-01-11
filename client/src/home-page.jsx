@@ -31,8 +31,9 @@ const HomePage = ({ seasons }) => {
         (a, b) =>
           (a.qualified !== "INEL") - (b.qualified !== "INEL") ||
           (season.provisional
-            ? a.projectedAvg - b.projectedAvg
-            : a.totalPoints - b.totalPoints)
+            ? a.projectedAvg[season.lastEvent] -
+              b.projectedAvg[season.lastEvent]
+            : a.totalPoints[season.lastEvent] - b.totalPoints[season.lastEvent])
       )
       .pop();
     console.log(winner);
