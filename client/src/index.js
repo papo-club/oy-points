@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-import ResultsPage from "./results-page";
 import HomePage from "./home-page";
 import "./index.css";
+import ResultsPage from "./results-page";
 
 const App = () => {
   const [receivedResponse, setReceivedResponse] = useState(false);

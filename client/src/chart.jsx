@@ -1,11 +1,11 @@
 import {
+  CartesianGrid,
+  Legend,
+  Line,
   LineChart,
+  ResponsiveContainer,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Line,
-  Legend,
-  ResponsiveContainer,
 } from "recharts";
 
 const colours = [
