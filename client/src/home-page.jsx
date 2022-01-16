@@ -72,19 +72,25 @@ const HomePage = ({ seasons }) => {
                   {season.provisional ? "Current Winner" : "Winner"}
                 </th>
               </thead>
-              {Object.entries(points).map(([idgrade, competitors]) => {
-                return (
-                  <Link
-                    to={`/${year}/${idgrade}`}
-                    className="table-row hover:bg-gray-200 border-t"
-                  >
-                    <td className="p-1">{grades[idgrade].name}</td>
-                    <td className={season.provisional && "italic"}>
-                      {getWinner(season, competitors)}
-                    </td>
-                  </Link>
-                );
-              })}
+              {Object.entries(points)
+                .sort(
+                  ([a], [b]) =>
+                    grades[b].difficulty - grades[a].difficulty ||
+                    (grades[b].gender === "M" ? 1 : -1)
+                )
+                .map(([idgrade, competitors]) => {
+                  return (
+                    <Link
+                      to={`/${year}/${idgrade}`}
+                      className="table-row hover:bg-gray-200 border-t"
+                    >
+                      <td className="p-1">{grades[idgrade].name}</td>
+                      <td className={season.provisional && "italic"}>
+                        {getWinner(season, competitors)}
+                      </td>
+                    </Link>
+                  );
+                })}
             </table>
           </div>
         ))}
