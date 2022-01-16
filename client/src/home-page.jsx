@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import "./index.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import PapoLogo from "./images/papo-logo.png";
 import { faChevronRight } from "@fortawesome/free-solid-svg-icons";
 
 const HomePage = ({ seasons }) => {
@@ -50,10 +51,7 @@ const HomePage = ({ seasons }) => {
   return (
     <div className="max-w-screen-md m-auto">
       <div className="sm:m-10 p-4 flex flex-row items-center">
-        <img
-          src="https://papo.org.nz/themes/papo/images/papo-text-logo.png"
-          className="w-20 sm:w-40"
-        />
+        <img src={PapoLogo} className="w-20 sm:w-40" />
         <h1 className="text-3xl sm:text-6xl pl-4 sm:pl-12 font-title font-bold text-red-700">
           OY Points
         </h1>
