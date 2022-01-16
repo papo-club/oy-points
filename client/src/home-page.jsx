@@ -1,10 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useState } from "react";
-import "./index.css";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import PapoLogo from "./images/papo-logo.png";
-import { faChevronRight } from "@fortawesome/free-solid-svg-icons";
+import "./index.css";
 
 const HomePage = ({ seasons }) => {
   const [points, setPoints] = useState(null);

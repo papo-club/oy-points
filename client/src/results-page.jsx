@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Chart from "./chart";
+import PapoLogo from "./images/papo-logo.png";
 import PointsDerivationTable from "./points-derivation";
 import PointsTable from "./points-table";
-import PapoLogo from "./images/papo-logo.png";
 
 const ordinal = require("ordinal");
 const getPlacings = ([idevent], topXCompetitors) => {
