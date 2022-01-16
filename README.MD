@@ -2,9 +2,11 @@
 
 ## What is OY?
 
-This repo contains the source code for alculating points and placings for [PAPO Orienteering Club](https://papo.org.nz)'s Orienteer of the Year competition.
+This repo contains the source code for calculating points and placings for [PAPO Orienteering Club](https://papo.org.nz)'s Orienteer of the Year competition.
 
-The competition consists of 5-8 events throughout the year, and club members can earn points in each of them based on their performance in that event. At the end of the year, the orienteer in each category with the most points is crowned the Orienteer of the Year. Rules for points allocation and more information on the competition can be found on the PAPO website [here](https://papo.org.nz/club-info/oy-points-2/).
+The competition consists of 5-8 events of various disciplines and terrain types throughout the year, and club members can earn points in each of them based on their performance in that event. At the end of the year, the orienteer in each category with the most points is crowned the Orienteer of the Year. Rules for points allocation and more information on the competition can be found on the PAPO website [here](https://papo.org.nz/club-info/oy-points-2/).
+
+The competition is heavily inspired by the [Ultimate Orienteer](https://cascadeoc.org/series/ultimate-orienteer/) competition run by [Cascade Orienteering Club](https://cascadeoc.org/) in the USA.
 
 ## Repo structure
 
