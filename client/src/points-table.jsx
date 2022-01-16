@@ -5,6 +5,28 @@ const derivationColors = {
 };
 
 const PointsTable = ({ season, competitors, events, eligibility }) => {
+  const createPlacings = (season, competitors) => {
+    let placings = [0];
+    let lastPoints = Infinity;
+    for (let [idcompetitor, competitor] of competitors) {
+      const points = season.provisional
+        ? competitor.projectedAvg[season.lastEvent]
+        : competitor.totalPoints[season.numEvents];
+      const lastPlacing = placings[placings.length - 1];
+      if (points === lastPoints) {
+        placings.push(lastPlacing);
+      } else {
+        lastPoints = points;
+        placings.push(
+          lastPlacing +
+            placings.filter((placing) => placing == lastPlacing).length
+        );
+      }
+    }
+    return placings.slice(1);
+  };
+  const placings = createPlacings(season, competitors);
+
   return (
     <div className="relative overflow-auto lg:overflow-visible whitespace-nowrap">
       <table className="w-full border-collapse">
@@ -31,7 +53,7 @@ const PointsTable = ({ season, competitors, events, eligibility }) => {
           </th>
         </thead>
         <tbody>
-          {competitors.map(([idcompetitor, competitor], place) => (
+          {competitors.map(([idcompetitor, competitor], index) => (
             <tr className="odd:bg-white even:bg-gray-50">
               <th
                 className={`sticky text-2xl sm:text-4xl text-right font-title ${
@@ -40,7 +62,9 @@ const PointsTable = ({ season, competitors, events, eligibility }) => {
                     : "font-normal italic text-gray-400"
                 }`}
               >
-                {competitor.qualified !== "INEL" ? place + 1 : `(${place + 1})`}
+                {competitor.qualified !== "INEL"
+                  ? placings[index]
+                  : `(${placings[index]})`}
               </th>
               <th
                 className={`sticky pl-4 text-sm sm:text-base font-title text-left ${
