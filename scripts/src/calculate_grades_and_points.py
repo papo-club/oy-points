@@ -93,7 +93,8 @@ session.query(tables.MemberGrade).filter_by(year=season).delete()
 events = session.query(tables.Event).filter_by(year=season)
 members = session.query(tables.Member).filter_by(year=season)
 grades = session.query(tables.Grade)
-events_finished = sum([event.number <= season.last_event for event in events])
+events_finished = sum(
+    [event.number <= season_info.last_event for event in events])
 events_to_go = events.count() - events_finished
 events_needed_to_qualify = 3
 events_needed_so_far_to_qualify = events_needed_to_qualify - events_to_go
@@ -149,10 +150,20 @@ for member in members:
     most_raced_grades = [
         member_oy_grade for member_oy_grade,
         count in member_oy_grades.items() if count == most_races_in_one_grade]
+    # get list of all grades with the correct gender
+    most_raced_grades_gender = []
+    for grade in most_raced_grades:
+        if session.query(
+                tables.Grade).filter_by(
+                grade_id=grade).first().gender == member.gender:
+            most_raced_grades_gender.append(grade)
+    # if only incorrect gender, good enough
+    if not most_raced_grades_gender:
+        most_raced_grades_gender = most_raced_grades
 
     member_grade = None
     hardest_grade_difficulty = 0
-    for grade in most_raced_grades:
+    for grade in most_raced_grades_gender:
         # get grade from grade id
         grade = session.query(tables.Grade).filter_by(
             grade_id=grade
