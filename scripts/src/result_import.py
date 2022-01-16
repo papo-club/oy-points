@@ -9,6 +9,7 @@ from clinput import prompt
 
 from fuzzywuzzy import fuzz, process
 from helpers.connection import commit_and_close, session, tables
+from sqlalchemy import update
 from helpers.args import get_filename, get_season
 
 logging.basicConfig(level=logging.WARNING, format="")
@@ -359,6 +360,11 @@ logging.info(", ".join(
 logging.critical("continue with import?")
 answer = stdin.readline().strip()
 if answer.lower() in {"y", "yes"}:
+    session.execute(
+        update(
+            tables.Season).where(
+            tables.Season.year == season).values(
+                last_event=event_number))
     commit_and_close()
     logging.critical("import complete")
 else:
