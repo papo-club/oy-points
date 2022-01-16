@@ -36,13 +36,17 @@ const HomePage = ({ seasons }) => {
             : a.totalPoints[season.lastEvent] - b.totalPoints[season.lastEvent])
       )
       .pop();
-    console.log(winner);
     return winner && winner.qualified !== "INEL"
       ? `${winner.firstName} ${winner.lastName}`
       : undefined;
   };
 
-  if (!points || !grades) return "Loading...";
+  if (!points || !grades)
+    return (
+      <div className="w-screen h-screen flex flex-row items-center justify-center text-2xl sm:text-4xl text-gray-300 font-title tracking-wider">
+        Loading...
+      </div>
+    );
   return (
     <div className="max-w-screen-md m-auto">
       <div className="sm:m-10 p-4 flex flex-row items-center">
@@ -58,9 +62,7 @@ const HomePage = ({ seasons }) => {
         .sort(([yeara], [yearb]) => yearb - yeara)
         .map(([year, season, points]) => (
           <div className="bg-gray-100 sm:m-10 flex flex-col items-stretch p-4">
-            <h1 className="text-8xl p-3 font-title hover:bg-gray-200">
-              <Link to={`/${year}`}>{year}</Link>
-            </h1>
+            <h1 className="text-8xl p-3 font-title">{year}</h1>
             <table className="mt-4 text-left">
               <thead>
                 <th className="font-bold text-lg sm:text-2xl font-title">
