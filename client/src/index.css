@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url("https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&family=Raleway:wght@400;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&family=Raleway:wght@400;600;700&display=swap");
 
 th.rotated-header > div {
   transform: translate(calc(100% - 1px / 2), 1px) rotate(-45deg);
@@ -11,8 +11,4 @@ th.rotated-header > div {
 
 th.rotated-header > div > div {
   max-width: 12em;
-}
-
-td:last-child {
-  border: 0;
 }

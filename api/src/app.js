@@ -185,6 +185,7 @@ const getSeasons = (season) => {
     7: 5,
     8: 5,
   };
+
   return new Promise((resolve, reject) => {
     if (season) {
       connection.query(
@@ -198,7 +199,9 @@ const getSeasons = (season) => {
               MIN_TIME_POINTS: row.min_time_points,
               numEvents: row.num_events,
               numEventsCount: countsTowardsTotal[row.num_events],
+              numEventsToQualify: MIN_EVENTS_TO_QUALIFY,
               provisional: row.provisional,
+              lastEvent: row.last_event,
             });
           } else {
             resolve(null);
@@ -216,7 +219,9 @@ const getSeasons = (season) => {
             MIN_TIME_POINTS: row.min_time_points,
             numEvents: row.num_events,
             numEventsCount: countsTowardsTotal[row.num_events],
+            numEventsToQualify: MIN_EVENTS_TO_QUALIFY,
             provisional: row.provisional,
+            lastEvent: row.last_event,
           };
         }
         resolve(seasons);
@@ -271,6 +276,8 @@ app.get("/points/:year/:grade?", (req, res) => {
                   // totalPoints: totalPoints.toFixed(2),
                   qualified: memberStatus["eligibility"],
                   results: {},
+                  totalPoints: {},
+                  projectedAvg: {},
                 };
               }
             }
@@ -306,32 +313,42 @@ app.get("/points/:year/:grade?", (req, res) => {
               })
             )
               .then(() => {
-                eventsToGo = Object.entries(events).filter(
-                  ([idevent, _event]) => _event.date > new Date()
-                ).length;
-                Object.entries(return_result).map(([grade_id, members]) =>
-                  Object.entries(members).map(([member_id, member]) => {
-                    let [totalPoints, eventsCompeted] = Object.entries(
-                      member.results
-                    ).reduce(
-                      ([points, number], [idevent, _event]) =>
-                        return_result[grade_id][member_id].results[idevent]
-                          .countsTowardsTotal
-                          ? [points + _event.points, number + 1]
-                          : [points, number],
-                      [0, 0]
-                    );
-                    return_result[grade_id][member_id].totalPoints =
-                      +totalPoints.toFixed(2);
-                    return_result[grade_id][member_id].projectedAvg = +(
-                      (totalPoints / eventsCompeted) *
-                      Math.min(
-                        eventsCompeted + eventsToGo,
-                        season.numEventsCount
-                      )
-                    ).toFixed(1);
-                  })
+                pastEvents = Object.entries(events).filter(
+                  ([idevent, event_]) => idevent <= season.lastEvent
                 );
+                eventsToGo = season.numEvents - pastEvents.length;
+                for (let [currentidevent, currentevent_] of pastEvents) {
+                  Object.entries(return_result).map(([grade_id, members]) =>
+                    Object.entries(members).map(([member_id, member]) => {
+                      let [totalPoints, eventsCompeted] = Object.entries(
+                        member.results
+                      )
+                        .filter(
+                          ([idevent, _event]) => idevent <= currentidevent
+                        )
+                        .reduce(
+                          ([points, number], [idevent, _event]) =>
+                            return_result[grade_id][member_id].results[idevent]
+                              .countsTowardsTotal
+                              ? [points + _event.points, number + 1]
+                              : [points, number],
+                          [0, 0]
+                        );
+                      return_result[grade_id][member_id].totalPoints[
+                        currentidevent
+                      ] = +totalPoints.toFixed(2);
+                      return_result[grade_id][member_id].projectedAvg[
+                        currentidevent
+                      ] = +(
+                        (totalPoints / eventsCompeted) *
+                        Math.min(
+                          eventsCompeted + (season.numEvents - currentidevent),
+                          season.numEventsCount
+                        )
+                      ).toFixed(1);
+                    })
+                  );
+                }
               })
               .then(() => {
                 if (req.params.grade) {
