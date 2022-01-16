@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<!--
+-
+- Sequel Ace XML dump
+- Version 20021
+-
+- https://sequel-ace.com/
+- https://github.com/Sequel-Ace/Sequel-Ace
+-
+- Host: localhost (MySQL 8.0.27)
+- Database: oypoints
+- Generation Time Time: 2022-01-16 23:09:24 +0000
+-
+-->
+
+<mysqldump xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<database name="oypoints">
+
+	<table_structure name="member_grade">
+		<field field="member_id" type="{length = 3, bytes = 0x696e74}" null="NO" key="{length = 3, bytes = 0x505249}" default="<null>" extra="" />
+		<field field="year" type="{length = 4, bytes = 0x79656172}" null="NO" key="{length = 3, bytes = 0x505249}" default="<null>" extra="" />
+		<field field="grade_id" type="{length = 10, bytes = 0x76617263686172283329}" null="NO" key="{length = 3, bytes = 0x4d554c}" default="<null>" extra="" />
+		<field field="eligibility_id" type="{length = 10, bytes = 0x76617263686172283429}" null="NO" key="{length = 3, bytes = 0x4d554c}" default="{length = 0, bytes = 0x}" extra="" />
+
+		<options name="member_grade" engine="InnoDB" version="10" row_format="{length = 7, bytes = 0x44796e616d6963}" rows="373" avg_row_length="43" data_length="16384" max_data_length="0" index_length="49152" data_free="0" create_time="2021-11-29 17:10:02" update_time="2022-01-16 21:53:25" collation="utf8_general_ci" create_options="" comment="" />
+	</table_structure>
+
+</database>
+</mysqldump>
