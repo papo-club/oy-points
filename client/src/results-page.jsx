@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import Chart from "./chart";
 import PointsDerivationTable from "./points-derivation";
 import PointsTable from "./points-table";
+import PapoLogo from "./images/papo-logo.png";
 
 const ordinal = require("ordinal");
 const getPlacings = ([idevent], topXCompetitors) => {
@@ -240,7 +241,7 @@ const ResultsPage = () => {
           <div className="self-center lg:self-start">
             <Link to="/">
               <div className="self-center lg:self-start flex flex-row justify-center lg:justify-start lg:ml-1 h-5 mb-5">
-                <img src="https://papo.org.nz/themes/papo/images/papo-text-logo.png" />
+                <img src={PapoLogo} />
                 <h1 className="text-2xl ml-2 font-title self-center font-bold text-red-700">
                   OY Points
                 </h1>
