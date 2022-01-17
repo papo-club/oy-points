@@ -1,5 +1,5 @@
 import logging
-from clinput import prompt
+from invalid import prompt
 import sys
 from csv import DictReader
 from os import path

@@ -1,7 +1,7 @@
 import logging
 from os import path
 
-from clinput import prompt
+from invalid import prompt
 from .connection import session, tables
 from argparse import ArgumentParser, FileType
 import warnings

@@ -11,7 +11,7 @@ pytimeparse = "*"
 python-levenshtein = "*"
 sqlalchemy = "*"
 mysqlclient = "*"
-clinput = {path = "/Users/Ryan/Programming/Python/clinput"}
+invalid = "*"
 
 [dev-packages]
 wemake-python-styleguide = "*"
