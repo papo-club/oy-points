@@ -1,10 +1,9 @@
-const api = "http://localhost:9000";
 const globalEndpoints = ["grades", "derivation", "eligibility"];
 const seasonEndpoints = ["season", "points", "events"];
 const seasonEndpoint = "seasons";
 
 const fetchEndpoint = (endpoint, year = "") =>
-  fetch(`${api}/${endpoint}/${year}`).then((res) => res.json());
+  fetch(`/api/${endpoint}/${year}`).then((res) => res.json());
 
 const endpointsToObject = (endpoints, promises) =>
   Promise.all(promises).then((data) =>

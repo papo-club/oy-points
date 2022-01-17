@@ -3,3 +3,4 @@
 .env
 sample-data
 node_modules
+client/build
