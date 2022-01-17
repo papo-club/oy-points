@@ -2,14 +2,16 @@ const PointsDerivationTable = ({ derivation, season }) => (
   <div className="relative overflow-auto">
     <table className="border-collapse border-hidden">
       <thead>
-        <th className="text-right pr-3">Code</th>
-        <th className="text-left pr-3">Points</th>
-        <th className="text-left">Name</th>
-        <th className="text-left">Description</th>
+        <tr className="text-left">
+          <th className="text-right pr-3">Code</th>
+          <th className="pr-3">Points</th>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
       </thead>
       <tbody>
         {Object.entries(derivation).map(([idderivation, derivation]) => (
-          <tr className="odd:bg-white even:bg-gray-50 h-12">
+          <tr key={idderivation} className="odd:bg-white even:bg-gray-50 h-12">
             <td className="text-l border sm:text-2xl text-right font-title px-3 font-bold">
               {idderivation}
             </td>

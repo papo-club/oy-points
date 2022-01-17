@@ -59,6 +59,7 @@ const Chart = ({
           name={`${competitor.firstName} ${competitor.lastName}`}
           type="monotone"
           strokeWidth={4}
+          key={idcompetitor}
           dataKey={idcompetitor}
           stroke={colours[index]}
         />

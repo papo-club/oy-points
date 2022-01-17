@@ -47,7 +47,13 @@ const ResultsPage = ({
           />
         );
       case "stats":
-        return <StatsPage competitors={sortedCompetitors} />;
+        return (
+          <StatsPage
+            competitors={sortedCompetitors}
+            season={season}
+            events={events}
+          />
+        );
       case "help":
         return <HelpPage year={year} season={season} derivation={derivation} />;
       default:
