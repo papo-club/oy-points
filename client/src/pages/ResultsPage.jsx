@@ -31,9 +31,12 @@ const ResultsPage = ({
   );
 
   useEffect(() => {
-    document.title = `OY Points for ${year} | ${grades[grade].name}`;
     window.scrollTo(0, 0);
   }, []);
+
+  useEffect(() => {
+    document.title = `OY Points for ${year} | ${grades[grade].name}`;
+  }, [grade, grades, year]);
 
   const Subpage = ({ subpage }) => {
     switch (subpage) {
