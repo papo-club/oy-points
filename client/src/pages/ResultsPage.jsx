@@ -31,6 +31,7 @@ const ResultsPage = ({
   );
 
   useEffect(() => {
+    document.title = `OY Points for ${year} | ${grades[grade].name}`;
     window.scrollTo(0, 0);
   }, []);
 
