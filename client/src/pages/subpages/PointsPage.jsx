@@ -50,8 +50,8 @@ const PointsPage = ({ season, competitors, events, eligibility }) => {
                 <th className="lg:hidden">OY{idevent}</th>
               </React.Fragment>
             ))}
-            <th className="text-right pr-3">Points</th>
-            <th className="text-right pr-3">
+            <th className="text-right w-20 pr-3">Points</th>
+            <th className="text-right w-20 pr-3">
               {season.provisional ? "Projected Avg" : "Performance"}
             </th>
           </tr>
