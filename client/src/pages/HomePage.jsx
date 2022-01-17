@@ -5,6 +5,9 @@ import "../index.css";
 import SeasonCard from "../components/SeasonCard";
 
 const HomePage = ({ data: { seasons, grades } }) => {
+  useEffect(() => {
+    document.title = "PAPO OY Points";
+  });
   return (
     <div className="max-w-screen-md m-auto">
       <div className="sm:m-10 p-4 flex flex-row items-center">
