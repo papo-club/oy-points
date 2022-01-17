@@ -3,7 +3,7 @@ from sys import stdin
 
 from helpers.connection import session, tables, commit_and_close
 from sqlalchemy import select
-from clinput import prompt
+from invalid import prompt
 from helpers.args import get_season
 
 MAX_EVENTS = 10

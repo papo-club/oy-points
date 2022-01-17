@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 from os import path
 from sys import argv, stdin
 from typing import Optional
-from clinput import prompt
+from invalid import prompt
 
 from fuzzywuzzy import fuzz, process
 from helpers.connection import commit_and_close, session, tables
