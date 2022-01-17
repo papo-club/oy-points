@@ -1,7 +1,7 @@
-import React, { useState } from "react";
-import { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import ErrorMsg from "../components/ErrorMsg";
+import ProvisionalBadge from "../components/ProvisionalBadge";
 import PapoLogo from "../images/papo-logo.png";
 import HelpPage from "./subpages/HelpPage";
 import PointsPage from "./subpages/PointsPage";
@@ -84,17 +84,21 @@ const ResultsPage = ({
               </h1>
             </div>
           </Link>
-          <h1 className="hidden lg:inline font-title text-5xl">
+          <h1 className="hidden lg:block font-title text-5xl">
             {grades[grade].name
               .split(" ")
               .splice(0, grades[grade].name.split(" ").length - 1)
               .join(" ")}
-            <br />
-            {grades[grade].name.split(" ").splice(-1)}
           </h1>
-          <h1 className="inline lg:hidden font-title text-3xl sm:text-4xl">
-            {grades[grade].name}
-          </h1>
+          <div className="flex flex-row items-center gap-5">
+            <h1 className="hidden lg:block font-title text-5xl">
+              {grades[grade].name.split(" ").splice(-1)}
+            </h1>
+            <h1 className="inline lg:hidden font-title text-3xl sm:text-4xl">
+              {grades[grade].name}
+            </h1>
+            <ProvisionalBadge provisional={season.provisional} />
+          </div>
         </div>
         <div className="self-center lg:self-start flex flex-row gap-5">
           <NavbarButton id="points" />

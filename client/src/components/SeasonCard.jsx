@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import ProvisionalBadge from "../components/ProvisionalBadge";
 
 const getWinner = (season, competitors) => {
   const winner = Object.values(competitors)
@@ -20,7 +21,12 @@ const SeasonCard = ({ grades, season, year }) => {
 
   return (
     <div className="bg-gray-100 sm:m-10 flex flex-col items-stretch p-4">
-      <h1 className="text-8xl p-3 font-title">{year}</h1>
+      <div className="flex flex-col sm:flex-row items-start sm:items-end">
+        <h1 className="text-8xl p-3 font-title">{year}</h1>
+        <div className="relative -top-3 left-3.5 sm:left-0 sm:mb-3">
+          <ProvisionalBadge provisional={season.season.provisional} />
+        </div>
+      </div>
       <table className="mt-4 text-left">
         <thead>
           <tr>
