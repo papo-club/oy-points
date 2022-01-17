@@ -9,7 +9,7 @@
     "client:build": "cd client && npm install && npm run build",
     "script": "cd scripts && pipenv run --",
     "web": "npm run api & npm run client",
-    "start": "npm run api:build",
+    "heroku-build": "npm run api:build",
     "heroku-postbuild": "npm run client:build"
   },
   "repository": {
