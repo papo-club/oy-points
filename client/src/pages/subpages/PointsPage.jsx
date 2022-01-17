@@ -4,7 +4,7 @@ const derivationColors = {
   CTRL: "bg-yellow-100",
 };
 
-const PointsTable = ({ season, competitors, events, eligibility }) => {
+const PointsPage = ({ season, competitors, events, eligibility }) => {
   const createPlacings = (season, competitors) => {
     let placings = [0];
     let lastPoints = Infinity;
@@ -127,4 +127,4 @@ const PointsTable = ({ season, competitors, events, eligibility }) => {
   );
 };
 
-export default PointsTable;
+export default PointsPage;

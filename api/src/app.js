@@ -209,23 +209,13 @@ const getSeasons = (season) => {
         }
       );
     } else {
-      connection.query(`SELECT * from oypoints.season`, (err, rows, fields) => {
-        if (err) throw err;
-        seasons = {};
-        for (row of rows) {
-          seasons[row.year] = {
-            MAX_POINTS: row.max_points,
-            MIN_POINTS: row.min_points,
-            MIN_TIME_POINTS: row.min_time_points,
-            numEvents: row.num_events,
-            numEventsCount: countsTowardsTotal[row.num_events],
-            numEventsToQualify: MIN_EVENTS_TO_QUALIFY,
-            provisional: row.provisional,
-            lastEvent: row.last_event,
-          };
+      connection.query(
+        `SELECT year from oypoints.season`,
+        (err, rows, fields) => {
+          if (err) throw err;
+          resolve(rows.map((row) => row.year));
         }
-        resolve(seasons);
-      });
+      );
     }
   });
 };
@@ -234,8 +224,12 @@ app.get("/", (req, res) => {
   res.send("API Home");
 });
 
-app.get("/seasons/:year?", (req, res) => {
+app.get("/season/:year", (req, res) => {
   getSeasons(req.params.year).then((seasons) => res.send(seasons));
+});
+
+app.get("/seasons", (req, res) => {
+  getSeasons().then((seasons) => res.send(seasons));
 });
 
 app.get("/members/:year", (req, res) => {
@@ -250,12 +244,12 @@ app.get("/events/:year", (req, res) => {
   getEvents(req.params.year).then((events) => res.send(events));
 });
 
-app.get("/eligibility/:year", (req, res) => {
-  getEligibility(req.params.year).then((eligibility) => res.send(eligibility));
+app.get("/eligibility", (req, res) => {
+  getEligibility().then((eligibility) => res.send(eligibility));
 });
 
-app.get("/derivation/:year", (req, res) => {
-  getDerivation(req.params.year).then((derivation) => res.send(derivation));
+app.get("/derivation", (req, res) => {
+  getDerivation().then((derivation) => res.send(derivation));
 });
 
 app.get("/points/:year/:grade?", (req, res) => {

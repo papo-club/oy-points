@@ -1,23 +1,26 @@
-import HomePage from "./pages/HomePage";
-import ResultsPage from "./pages/ResultsPage";
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import getAllData from "./adapter";
 import "./index.css";
+import HomePage from "./pages/HomePage";
+import ResultsPage from "./pages/ResultsPage";
+import ErrorMsg from "./components/ErrorMsg";
 
 const App = () => {
-  const [receivedResponse, setReceivedResponse] = useState(false);
-  const [seasons, setSeasons] = useState(null);
+  const [receivedResponse, setReceivedResponse] = useState(null);
+  const [data, setData] = useState({
+    seasons: null,
+    grades: null,
+    derivation: null,
+    eligibility: null,
+  });
 
   useEffect(() => {
-    const api = "http://localhost:9000/";
-    const endpoints = [["seasons", setSeasons]];
-    const promises = endpoints.map(([endpoint, setter]) => {
-      return fetch(api + endpoint)
-        .then((res) => res.json())
-        .then((json) => setter(json));
-    });
-    Promise.all(promises).then(() => setReceivedResponse(true));
+    Promise.resolve(getAllData())
+      .then(setData)
+      .then(() => setReceivedResponse(true))
+      .catch((error) => setReceivedResponse(false));
   }, []);
 
   switch (receivedResponse) {
@@ -26,16 +29,19 @@ const App = () => {
         <Router>
           <Routes>
             <Route path="/">
-              <Route index element={<HomePage seasons={seasons} />} />
-              <Route path=":year/:grade" element={<ResultsPage />}></Route>
+              <Route index element={<HomePage data={data} />} />
+              <Route
+                path=":year/:grade"
+                element={<ResultsPage data={data} />}
+              ></Route>
             </Route>
           </Routes>
         </Router>
       );
     case false:
-      return <>Loading...</>;
+      return <ErrorMsg text="Sorry, API is down. Try again later" />;
     default:
-      return <h1>Sorry, an error occurred</h1>;
+      return <ErrorMsg text="Loading..." />;
   }
 };
 
