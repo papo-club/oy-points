@@ -1,3 +1,5 @@
+import React from "react";
+
 const derivationColors = {
   WIN: "bg-green-100",
   PLAN: "bg-yellow-100",
@@ -8,7 +10,7 @@ const PointsPage = ({ season, competitors, events, eligibility }) => {
   const createPlacings = (season, competitors) => {
     let placings = [0];
     let lastPoints = Infinity;
-    for (let [idcompetitor, competitor] of competitors) {
+    for (let [, competitor] of competitors) {
       const points = season.provisional
         ? competitor.projectedAvg[season.lastEvent]
         : competitor.totalPoints[season.numEvents];
@@ -19,7 +21,7 @@ const PointsPage = ({ season, competitors, events, eligibility }) => {
         lastPoints = points;
         placings.push(
           lastPlacing +
-            placings.filter((placing) => placing == lastPlacing).length
+            placings.filter((placing) => placing === lastPlacing).length
         );
       }
     }
@@ -31,32 +33,34 @@ const PointsPage = ({ season, competitors, events, eligibility }) => {
     <div className="relative overflow-auto lg:overflow-visible whitespace-nowrap">
       <table className="w-full border-collapse">
         <thead>
-          <th className="sticky w-2 text-right border-b">
-            {season.provisional ? "Current Placing" : "Place"}
-          </th>
-          <th className="sticky w-40 text-left pl-4 border-b">Competitor</th>
-          {Object.entries(events).map(([idevent, event_]) => (
-            <>
-              <th className="hidden lg:table-cell relative whitespace-nowrap rotated-header">
-                <div className="absolute bottom-0 left-0 text-left w-full">
-                  <div className="absolute bottom-0 left-0 border-b overflow-hidden text-ellipsis">
-                    OY{idevent} - {event_.name}
+          <tr className="border-b">
+            <th className="w-2 text-right">
+              {season.provisional ? "Current Placing" : "Place"}
+            </th>
+            <th className="w-40 text-left pl-4">Competitor</th>
+            {Object.entries(events).map(([idevent, event_]) => (
+              <React.Fragment key={idevent}>
+                <th className="hidden lg:table-cell relative whitespace-nowrap rotated-header">
+                  <div className="absolute bottom-0 left-0 text-left w-full">
+                    <div className="absolute bottom-0 left-0 border-b overflow-hidden text-ellipsis">
+                      OY{idevent} - {event_.name}
+                    </div>
                   </div>
-                </div>
-              </th>
-              <th className="lg:hidden">OY{idevent}</th>
-            </>
-          ))}
-          <th className="sticky w-20 text-right pr-3">Points</th>
-          <th className="border-b sticky w-20 text-right pr-3">
-            {season.provisional ? "Projected Avg" : "Performance"}
-          </th>
+                </th>
+                <th className="lg:hidden">OY{idevent}</th>
+              </React.Fragment>
+            ))}
+            <th className="text-right pr-3">Points</th>
+            <th className="text-right pr-3">
+              {season.provisional ? "Projected Avg" : "Performance"}
+            </th>
+          </tr>
         </thead>
         <tbody>
           {competitors.map(([idcompetitor, competitor], index) => (
-            <tr className="odd:bg-white even:bg-gray-50">
+            <tr key={idcompetitor} className="odd:bg-white even:bg-gray-50">
               <th
-                className={`sticky text-2xl sm:text-4xl text-right font-title ${
+                className={`text-2xl sm:text-4xl text-right font-title ${
                   competitor.qualified !== "INEL"
                     ? "font-bold"
                     : "font-normal italic text-gray-400"
@@ -67,15 +71,16 @@ const PointsPage = ({ season, competitors, events, eligibility }) => {
                   : `(${placings[index]})`}
               </th>
               <th
-                className={`sticky pl-4 text-sm sm:text-base font-title text-left ${
+                className={`pl-4 text-sm sm:text-base font-title text-left ${
                   competitor.qualified !== "INEL" || "text-gray-400"
                 }`}
               >
                 <div>{`${competitor.firstName} ${competitor.lastName}`}</div>
                 <div>{eligibility[competitor.qualified].name}</div>
               </th>
-              {Object.entries(events).map(([idevent, event_]) => (
+              {Object.entries(events).map(([idevent]) => (
                 <td
+                  key={idevent}
                   className={
                     "min-w-20 w-20 border-r border-t p-2 " +
                     (competitor.results[idevent]?.countsTowardsTotal &&
@@ -96,7 +101,7 @@ const PointsPage = ({ season, competitors, events, eligibility }) => {
               ))}
               <th
                 className={
-                  "sticky text-2xl border-t min-w-24 sm:text-4xl text-right pr-3 font-title " +
+                  "text-2xl border-t min-w-24 sm:text-4xl text-right pr-3 font-title " +
                   (competitor.qualified !== "INEL"
                     ? "font-bold"
                     : "font-normal italic text-gray-400")
@@ -106,7 +111,7 @@ const PointsPage = ({ season, competitors, events, eligibility }) => {
               </th>
               <th
                 className={
-                  "sticky text-xl sm:text-3xl text-right pr-3 font-title " +
+                  "text-xl sm:text-3xl text-right pr-3 font-title " +
                   (competitor.qualified !== "INEL"
                     ? "font-bold"
                     : "font-normal italic text-gray-400")
