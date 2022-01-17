@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import ErrorMsg from "../components/ErrorMsg";
 import PapoLogo from "../images/papo-logo.png";
@@ -28,6 +29,10 @@ const ResultsPage = ({
       )
     ).entries()
   );
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const Subpage = ({ subpage }) => {
     switch (subpage) {
