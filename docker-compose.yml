@@ -29,6 +29,7 @@ services:
       - "traefik.enable=false"
     environment:
       MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+      MYSQL_DATABASE: papo_oypoints
     secrets:
       - db_root_password
   
@@ -45,10 +46,13 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.port=9000"
-      #- "traefik.http.routers.whoami.rule=Host(`whoami.localhost`)"
+      #- "traefik.http.routers.whoami.rule=Host(`localhost`)"
       - "traefik.http.routers.whoami.entrypoints=api"
     environment:
+      MYSQL_HOST: localhost
+      MYSQL_USER: root
       MYSQL_PASSWORD: /run/secrets/db_root_password
+      MYSQL_DB: papo_oypoints
     secrets:
       - db_root_password
 
