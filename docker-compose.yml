@@ -1,0 +1,69 @@
+version: "3.8"
+
+services:
+
+  traefik:
+    image: "traefik:v2.6"
+    restart: unless-stopped
+    container_name: "traefik"
+    command:
+      #- "--log.level=DEBUG"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "443:443"
+      # The Web UI (enabled by --api.insecure=true)
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
+  db:
+    image: "mariadb:10"
+    restart: unless-stopped
+    volumes:
+      - ../data/db:/var/lib/mysql
+    labels:
+      - "traefik.enable=false"
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+    secrets:
+      - db_root_password
+  
+  
+  api:
+    image: papo/api
+    build: 
+      context: api
+      dockerfile: Dockerfile
+    links:
+      - db:mysql      
+    depends_on:
+      - db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.port=9000"
+      #- "traefik.http.routers.whoami.rule=Host(`whoami.localhost`)"
+      - "traefik.http.routers.whoami.entrypoints=api"
+    environment:
+      MYSQL_PASSWORD: /run/secrets/db_root_password
+    secrets:
+      - db_root_password
+
+  client:
+    image: papo/client    
+    build:
+      context: client
+      dockerfile: Dockerfile
+    depends_on:
+      - api
+    labels:
+      - "traefik.enable=true"
+      #- "traefik.http.routers.whoami.rule=Host(`whoami.localhost`)"
+      #- "traefik.http.routers.whoami.entrypoints=api"
+
+secrets:
+  db_root_password:
+    file: ../secrets/db_root_password.txt
