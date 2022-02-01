@@ -28,33 +28,32 @@ services:
     labels:
       - "traefik.enable=false"
     environment:
-      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
-      MYSQL_DATABASE: papo_oypoints
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+      MARIADB_DATABASE: papo_oypoints
+      MARIADB_USER: papo
+      MARIADB_PASSWORD_FILE: /run/secrets/db_password
     secrets:
       - db_root_password
-  
+      - db_password
   
   api:
     image: papo/api
     build: 
       context: api
       dockerfile: Dockerfile
-    links:
-      - db:mysql      
     depends_on:
       - db
     labels:
       - "traefik.enable=true"
       - "traefik.port=9000"
-      #- "traefik.http.routers.whoami.rule=Host(`localhost`)"
-      - "traefik.http.routers.whoami.entrypoints=api"
+      - "traefik.http.routers.api.rule=Host(`localhost`) && PathPrefix(`/api`)"
     environment:
-      MYSQL_HOST: localhost
-      MYSQL_USER: root
-      MYSQL_PASSWORD: /run/secrets/db_root_password
+      MYSQL_HOST: db
+      MYSQL_USER: papo
+      MYSQL_PASSWORD: /run/secrets/db_password
       MYSQL_DB: papo_oypoints
     secrets:
-      - db_root_password
+      - db_password
 
   client:
     image: papo/client    
@@ -65,9 +64,11 @@ services:
       - api
     labels:
       - "traefik.enable=true"
-      #- "traefik.http.routers.whoami.rule=Host(`whoami.localhost`)"
-      #- "traefik.http.routers.whoami.entrypoints=api"
+      - "traefik.port=80"
+      - "traefik.http.routers.client.rule=Host(`localhost`)"
 
 secrets:
   db_root_password:
     file: ../secrets/db_root_password.txt
+  db_password:
+    file: ../secrets/db_password.txt

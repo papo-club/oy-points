@@ -1,11 +1,17 @@
 const express = require("express");
 const mysql = require("mysql");
 const router = express.Router();
+const fs = require('fs');
+
+let password = process.env.MYSQL_PASSWORD || "root";
+if (process.env.MYSQL_PASSWORD && process.env.MYSQL_PASSWORD.startsWith("/run/secrets")) {
+  password = fs.readFileSync(process.env.MYSQL_PASSWORD, {encoding: 'utf8'}).trim();
+}
 
 var connection = mysql.createConnection({
   host: process.env.MYSQL_HOST || "127.0.0.1",
   user: process.env.MYSQL_USER || "root",
-  password: process.env.MYSQL_PASSWORD || "root",
+  password: password,
   database: process.env.MYSQL_DB || "oypoints",
 });
 
