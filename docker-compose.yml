@@ -5,7 +5,7 @@ services:
   traefik:
     image: "traefik:v2.6"
     restart: unless-stopped
-    container_name: "traefik"
+    container_name: "papo_traefik"
     command:
       #- "--log.level=DEBUG"
       - "--api.insecure=true"
@@ -22,6 +22,7 @@ services:
 
   db:
     image: "mariadb:10"
+    container_name: "papo_db"
     restart: unless-stopped
     volumes:
       - ../data/db:/var/lib/mysql
@@ -38,6 +39,8 @@ services:
   
   api:
     image: papo/api
+    container_name: "papo_api"
+    restart: unless-stopped
     build: 
       context: api
       dockerfile: Dockerfile
@@ -58,6 +61,8 @@ services:
 
   client:
     image: papo/client    
+    container_name: "papo_client"
+    restart: unless-stopped
     build:
       context: client
       dockerfile: Dockerfile
