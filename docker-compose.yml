@@ -14,7 +14,7 @@ services:
       - "--entrypoints.web.address=:80"
     ports:
       - "80:80"
-      - "443:443"
+      #- "443:443"
       # The Web UI (enabled by --api.insecure=true)
       - "8080:8080"
     volumes:
@@ -45,8 +45,9 @@ services:
       - db
     labels:
       - "traefik.enable=true"
-      - "traefik.port=9000"
-      - "traefik.http.routers.api.rule=Host(`localhost`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.api.entrypoints=web"
+      - "traefik.http.routers.api.rule=PathPrefix(`/api/`)"
+      - "traefik.http.services.api.loadbalancer.server.port=9000"
     environment:
       MYSQL_HOST: db
       MYSQL_USER: papo
@@ -64,8 +65,8 @@ services:
       - api
     labels:
       - "traefik.enable=true"
-      - "traefik.port=80"
-      - "traefik.http.routers.client.rule=Host(`localhost`)"
+      - "traefik.http.routers.client.entrypoints=web"
+      - "traefik.http.routers.client.rule=PathPrefix(`/`)"
 
 secrets:
   db_root_password:
