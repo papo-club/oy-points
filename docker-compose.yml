@@ -31,7 +31,7 @@ services:
     environment:
       MARIADB_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
       MARIADB_DATABASE: papo_oypoints
-      MARIADB_USER: papo
+      MARIADB_USER: papo_oypoints
       MARIADB_PASSWORD_FILE: /run/secrets/db_password
     secrets:
       - db_root_password
@@ -53,7 +53,7 @@ services:
       - "traefik.http.services.api.loadbalancer.server.port=9000"
     environment:
       MYSQL_HOST: db
-      MYSQL_USER: papo
+      MYSQL_USER: papo_oypoints
       MYSQL_PASSWORD: /run/secrets/db_password
       MYSQL_DB: papo_oypoints
     secrets:
