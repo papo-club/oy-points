@@ -12,13 +12,20 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.le.acme.httpchallenge=true"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.le.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+      - "--certificatesresolvers.le.acme.email=michael@smithson.co.nz"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
     ports:
       - "80:80"
-      #- "443:443"
+      - "443:443"
       # The Web UI (enabled by --api.insecure=true)
       - "8080:8080"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "../data/letsencrypt:/letsencrypt"
 
   db:
     image: "mariadb:10"
@@ -32,10 +39,10 @@ services:
       MARIADB_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
       MARIADB_DATABASE: papo_oypoints
       MARIADB_USER: papo_oypoints
-      MARIADB_PASSWORD_FILE: /run/secrets/db_password
+      MARIADB_PASSWORD_FILE: /run/secrets/db_papo_oypoints_password
     secrets:
       - db_root_password
-      - db_password
+      - db_papo_oypoints_password
   
   api:
     image: papo/api
@@ -48,16 +55,17 @@ services:
       - db
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.api.entrypoints=web"
-      - "traefik.http.routers.api.rule=PathPrefix(`/api/`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.rule=Host(`oypoints.papo.org.nz`) && PathPrefix(`/api/`)"
       - "traefik.http.services.api.loadbalancer.server.port=9000"
+      - "traefik.http.routers.api.tls.certresolver=le"
     environment:
       MYSQL_HOST: db
       MYSQL_USER: papo_oypoints
-      MYSQL_PASSWORD: /run/secrets/db_password
+      MYSQL_PASSWORD: /run/secrets/db_papo_oypoints_password
       MYSQL_DB: papo_oypoints
     secrets:
-      - db_password
+      - db_papo_oypoints_password
 
   client:
     image: papo/client    
@@ -70,11 +78,12 @@ services:
       - api
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.client.entrypoints=web"
-      - "traefik.http.routers.client.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.client.entrypoints=websecure"
+      - "traefik.http.routers.client.rule=Host(`oypoints.papo.org.nz`) && PathPrefix(`/`)"
+      - "traefik.http.routers.client.tls.certresolver=le"
 
 secrets:
   db_root_password:
     file: ../secrets/db_root_password.txt
-  db_password:
-    file: ../secrets/db_password.txt
+  db_papo_oypoints_password:
+    file: ../secrets/db_papo_oypoints_password.txt
