@@ -37,7 +37,7 @@ services:
       - "traefik.enable=false"
     environment:
       MARIADB_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
-      MARIADB_DATABASE: papo_oypoints
+      MARIADB_DATABASE: oypoints
       MARIADB_USER: papo_oypoints
       MARIADB_PASSWORD_FILE: /run/secrets/db_papo_oypoints_password
     secrets:
@@ -63,7 +63,6 @@ services:
       MYSQL_HOST: db
       MYSQL_USER: papo_oypoints
       MYSQL_PASSWORD: /run/secrets/db_papo_oypoints_password
-      MYSQL_DB: papo_oypoints
     secrets:
       - db_papo_oypoints_password
 
