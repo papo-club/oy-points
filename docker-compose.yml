@@ -31,6 +31,8 @@ services:
     image: "mariadb:10"
     container_name: "papo_db"
     restart: unless-stopped
+    ports:
+      - "3306:3306"
     volumes:
       - ../data/db:/var/lib/mysql
     labels:
