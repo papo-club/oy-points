@@ -18,6 +18,7 @@ RUN npm run build
 # Host the react app 
 
 FROM nginx:alpine
+COPY config/nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /app/build /usr/share/nginx/html
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
