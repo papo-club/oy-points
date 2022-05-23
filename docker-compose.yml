@@ -1,0 +1,90 @@
+version: "3.8"
+
+services:
+
+  traefik:
+    image: "traefik:v2.6"
+    restart: unless-stopped
+    container_name: "papo_traefik"
+    command:
+      #- "--log.level=DEBUG"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.le.acme.httpchallenge=true"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.le.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+      - "--certificatesresolvers.le.acme.email=michael@smithson.co.nz"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      # The Web UI (enabled by --api.insecure=true)
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "../data/letsencrypt:/letsencrypt"
+
+  db:
+    image: "mariadb:10"
+    container_name: "papo_db"
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    volumes:
+      - ../data/db:/var/lib/mysql
+    labels:
+      - "traefik.enable=false"
+    environment:
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+      MARIADB_DATABASE: oypoints
+      MARIADB_USER: papo_oypoints
+      MARIADB_PASSWORD_FILE: /run/secrets/db_papo_oypoints_password
+    secrets:
+      - db_root_password
+      - db_papo_oypoints_password
+  
+  api:
+    image: papo/api
+    container_name: "papo_api"
+    restart: unless-stopped
+    build: 
+      context: api
+      dockerfile: Dockerfile
+    depends_on:
+      - db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.rule=Host(`oypoints.papo.org.nz`) && PathPrefix(`/api/`)"
+      - "traefik.http.services.api.loadbalancer.server.port=9000"
+      - "traefik.http.routers.api.tls.certresolver=le"
+    environment:
+      MYSQL_HOST: db
+      MYSQL_USER: papo_oypoints
+      MYSQL_PASSWORD: /run/secrets/db_papo_oypoints_password
+    secrets:
+      - db_papo_oypoints_password
+
+  client:
+    image: papo/client    
+    container_name: "papo_client"
+    restart: unless-stopped
+    build:
+      context: client
+      dockerfile: Dockerfile
+    depends_on:
+      - api
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.client.entrypoints=websecure"
+      - "traefik.http.routers.client.rule=Host(`oypoints.papo.org.nz`) && PathPrefix(`/`)"
+      - "traefik.http.routers.client.tls.certresolver=le"
+
+secrets:
+  db_root_password:
+    file: ../secrets/db_root_password.txt
+  db_papo_oypoints_password:
+    file: ../secrets/db_papo_oypoints_password.txt
