@@ -2,14 +2,16 @@ import logging
 from collections import Counter
 from datetime import date, timedelta
 from enum import Enum
+from math import floor
 from statistics import mean
 
 from sqlalchemy import update
 
 from helpers.args import get_season
-from helpers.connection import commit_and_close, session, tables
+from helpers.connection import commit_and_close, get_session_and_tables
 
 logging.basicConfig(level=logging.INFO, format="")
+tunnel, session, tables = get_session_and_tables()
 
 season = get_season()
 season_info = session.query(tables.Season).filter_by(year=season).first()
@@ -101,6 +103,7 @@ events_needed_so_far_to_qualify = events_needed_to_qualify - events_to_go
 
 logging.info("Assigning grades to members...")
 for member in members:
+    logging.info(f"Assigning grades to {member.first_name} {member.last_name}")
     this_member = {
         "member_id": member.member_id,
         "year": season
@@ -182,7 +185,11 @@ for member in members:
         )
     )
 
+session.commit()
+
 for event in events:
+    if event.date > date.today():
+        continue
     logging.info(f"Assigning winning times for OY{event.number}...")
     # get races in event
     races = session.query(
@@ -203,11 +210,16 @@ for event in events:
     winners = {}
     # for each grade find winning time
     for grade in grades:
+        logging.info(f"Assigning winning times for grade {grade.name}")
         # get race grade associated with this oy grade
-        race_grade = session.query(
-            tables.RaceGrade.race_grade).filter_by(
-            grade_id=grade.grade_id,
-            event_number=event.number, year=season).first()[0]
+        # only if race grades have been calculated
+        try:
+            race_grade = session.query(
+                tables.RaceGrade.race_grade).filter_by(
+                grade_id=grade.grade_id,
+                event_number=event.number, year=season).first()[0]
+        except TypeError:
+            continue
         best_time = timedelta(1, 0, 0)
         worst_time = timedelta(0, 0, 0)
         best_points = 0
@@ -277,6 +289,7 @@ for event in events:
     # create set of all members in results
     competing_members = {*[result.member_id for result in results]}
     for member in competing_members:
+        logging.info(f"Assigning points for Member #{member}")
 
         # get all results for member
         all_member_results = session.query(
@@ -367,10 +380,10 @@ for event in events:
                                 # competitor did not reach max points
                                 # scale by slowest competitor time * points
                                 slowest_competitor_points = max(
-                                    round(
+                                    floor(
                                         MAX_POINTS * (winner["best"][1] /
-                                                      winner["worst"][1]), 1
-                                    ), MIN_TIME_POINTS)
+                                                      winner["worst"][1]) * 10
+                                    ) / 10, MIN_TIME_POINTS)
                                 points = slowest_competitor_points * \
                                     (member_results[0].points / races[0].max_points)
                         else:
@@ -382,7 +395,7 @@ for event in events:
                         # not a score event, scale by time
                         points = MAX_POINTS * (winner / time)
                     # if points < minimum points, set to minimum
-                    points = max(round(points, 1), MIN_TIME_POINTS)
+                    points = max(floor(points * 10) / 10, MIN_TIME_POINTS)
                     # if competitor received maximum points, set to winner
                     if points == MAX_POINTS:
                         derivation = Derivation.WIN
@@ -420,11 +433,11 @@ for event in events:
         year=season,
         event_number=event.number)
     for admin in admins:
-        # session.query(tables.Points).filter_by(
-        #     year=season,
-        #     event_number=event.number,
-        #     member_id=admin.member_id
-        # ).delete()  # if the admin set/controlled event, delete their existing points
+        session.query(tables.Points).filter_by(
+            year=season,
+            event_number=event.number,
+            member_id=admin.member_id
+        ).delete()  # if the admin set/controlled event, delete their existing points
         # test whether admin has competed in oy year yet
         if session.query(
                 tables.MemberGrade).filter_by(
@@ -463,4 +476,4 @@ for member in members:
                             counts_towards_total=False))
 
 
-commit_and_close()
+commit_and_close(tunnel, session)

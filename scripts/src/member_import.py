@@ -1,15 +1,13 @@
 import logging
-from invalid import prompt
-import sys
-from csv import DictReader
-from os import path
-from sys import stdin
 
-from helpers.connection import commit_and_close, tables, session
+from csv import DictReader
+
+from helpers.connection import commit_and_close, get_session_and_tables
 from helpers.args import get_filename, get_season
 
 logging.basicConfig(level=logging.INFO, format="")
 season = get_season()
+tunnel, session, tables = get_session_and_tables()
 
 fieldname_mapper = {
     "member_id": "ONZ ID",
@@ -30,4 +28,4 @@ with open(get_filename(), "r") as members_csv:
                                     ),
                       )
 
-commit_and_close()
+commit_and_close(tunnel, session)

@@ -2,7 +2,7 @@ import logging
 from os import path
 
 from invalid import prompt
-from .connection import session, tables
+from .connection import commit_and_close, get_session_and_tables
 from argparse import ArgumentParser, FileType
 import warnings
 from sqlalchemy import exc as sa_exc
@@ -16,6 +16,7 @@ def _parse_args():
 
 
 def get_season() -> int:
+    tunnel, session, tables = get_session_and_tables()
     args = _parse_args()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=sa_exc.SAWarning)
@@ -28,6 +29,7 @@ def get_season() -> int:
         logging.critical(
             f"Command line argument {args.year} is not a valid season",
         )
+    commit_and_close(tunnel, session)
     return prompt.List(
         "season",
         seasons,

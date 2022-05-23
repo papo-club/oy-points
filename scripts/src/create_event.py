@@ -1,9 +1,12 @@
 import logging
-from sys import stdin
+from types import SimpleNamespace
 
-from helpers.connection import session, tables, commit_and_close
-from sqlalchemy import select
+import sshtunnel
 from invalid import prompt
+from sqlalchemy import create_engine, select
+from sqlalchemy.ext.automap import automap_base
+from sqlalchemy.orm import Session  # type: ignore
+from helpers.connection import get_session_and_tables, commit_and_close
 from helpers.args import get_season
 
 MAX_EVENTS = 10
@@ -11,6 +14,8 @@ MAX_RACES = 3
 
 logging.basicConfig(level=logging.INFO, format="")
 season = get_season()
+
+tunnel, session, tables = get_session_and_tables()
 
 disciplines = session.query(tables.Discipline)
 
@@ -36,12 +41,12 @@ session.add(
     ),
 )
 
-for race_props in range(1, event_props["races"] + 1):
-    logging.info(f"RACE {race_props + 1}")
+for race in range(1, event_props["races"] + 1):
+    logging.info(f"RACE {race + 1}")
     race_props = prompt.Form({
-        "map": prompt.Text(f"map name for race {race_props}"),
+        "map": prompt.Text(f"map name for race {race}"),
         "discipline": prompt.List(
-            f"discipline for race {race_props}", {
+            f"discipline for race {race}", {
                 discipline.name: discipline.discipline_id for discipline in session.query(
                     tables.Discipline
                 ).all()
@@ -52,10 +57,10 @@ for race_props in range(1, event_props["races"] + 1):
         tables.Race(
             year=season,
             event_number=event_props["number"],
-            number=race_props,
+            number=race,
             map=race_props["map"],
             discipline_id=race_props["discipline"],
         ),
     )
 
-commit_and_close()
+commit_and_close(tunnel, session)

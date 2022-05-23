@@ -4,8 +4,6 @@ const router = require("./api.js");
 
 const app = express();
 
-app.use(cors());
-
 const port = 9000;
 const env = process.env.NODE_ENV || "development";
 
@@ -26,9 +24,6 @@ if (env === "production") {
 } else {
   app.use("/api", router);
 }
-
-const MIN_EVENTS_TO_QUALIFY = 3;
-const BEST_X_SCORES = 5;
 
 app.listen(port, () => {
   console.log(`App listening at http://localhost:${port}`);

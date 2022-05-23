@@ -12,6 +12,7 @@ python-levenshtein = "*"
 sqlalchemy = "*"
 mysqlclient = "*"
 invalid = "*"
+sshtunnel = "*"
 
 [dev-packages]
 wemake-python-styleguide = "*"

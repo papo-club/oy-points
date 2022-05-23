@@ -2,17 +2,18 @@ import logging
 import re
 from csv import DictReader
 from datetime import date, datetime, timedelta
-from os import path
-from sys import argv, stdin
+from sys import stdin
 from typing import Optional
-from invalid import prompt
 
 from fuzzywuzzy import fuzz, process
-from helpers.connection import commit_and_close, session, tables
+from invalid import prompt
 from sqlalchemy import update
+
 from helpers.args import get_filename, get_season
+from helpers.connection import commit_and_close, get_session_and_tables
 
 logging.basicConfig(level=logging.WARNING, format="")
+tunnel, session, tables = get_session_and_tables()
 season = get_season()
 filename = get_filename()
 
@@ -365,7 +366,7 @@ if answer.lower() in {"y", "yes"}:
             tables.Season).where(
             tables.Season.year == season).values(
                 last_event=event_number))
-    commit_and_close()
+    commit_and_close(tunnel, session)
     logging.critical("import complete")
 else:
     logging.critical("import aborted")
