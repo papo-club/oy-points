@@ -1,5 +1,6 @@
 """Define cursor object so the other scripts can connect to the database."""
 import logging
+from dotenv import load_dotenv
 from os import environ
 from types import SimpleNamespace
 from sqlalchemy.schema import Table
@@ -7,6 +8,8 @@ from sqlalchemy.ext.automap import automap_base
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, registry  # type: ignore
 import sshtunnel
+
+load_dotenv()
 
 uri_args = {
     "mysql": {
