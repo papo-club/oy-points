@@ -1,10 +1,9 @@
 const express = require("express");
-const cors = require('cors')
-
+const cors = require("cors");
 const router = require("./api.js");
 
 const app = express();
-
+app.use(cors());
 const port = 9000;
 const env = process.env.NODE_ENV || "development";
 

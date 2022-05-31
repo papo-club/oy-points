@@ -1,181 +1,73 @@
 const express = require("express");
-const mysql = require("mysql");
 const router = express.Router();
-const fs = require('fs');
-
-let password = process.env.MYSQL_PASSWORD || "root";
-if (process.env.MYSQL_PASSWORD && process.env.MYSQL_PASSWORD.startsWith("/run/secrets")) {
-  password = fs.readFileSync(process.env.MYSQL_PASSWORD, {encoding: 'utf8'}).trim();
-}
-
-var connection = mysql.createConnection({
-  host: process.env.MYSQL_HOST || "127.0.0.1",
-  user: process.env.MYSQL_USER || "root",
-  password: password,
-  database: "oypoints",
-});
-
-connection.connect();
+const { asyncQuery, queryToObject } = require("./orm.js");
 
 MIN_EVENTS_TO_QUALIFY = 3;
 
-const getMembers = (season) => {
-  return new Promise((resolve, reject) => {
-    connection.query(
-      `SELECT * from oypoints.member WHERE year=${season}`,
-      (err, rows, fields) => {
-        if (err) throw err;
-        members = {};
-        for (row of rows) {
-          members[row.member_id] = {
-            lastName: row.last_name,
-            firstName: row.first_name,
-          };
-        }
-        resolve(members);
-      }
-    );
-  });
+const getPoints = async (season) => {
+  const rows = await asyncQuery(
+    `SELECT * from oypoints.points WHERE year=${season}`
+  );
+
+  return rows
+    .map((row) => ({
+      points: row.points_generated,
+      derivation: row.points_derivation_id,
+      countsTowardsTotal: Boolean(row.counts_towards_total),
+      member: row.member_id,
+      event: row.event_number,
+    }))
+    .sort((a, b) => a.points - b.points);
 };
 
-const getEligibility = () => {
-  return new Promise((resolve, reject) => {
-    connection.query(
-      `SELECT * from oypoints.eligibility`,
-      (err, rows, fields) => {
-        if (err) throw err;
-        eligibility = {};
-        for (row of rows) {
-          eligibility[row.eligibility_id] = {
-            name: row.type,
-          };
-        }
-        resolve(eligibility);
-      }
-    );
-  });
+const getEvent = async (season, number) => {
+  const rows = await asyncQuery(
+    `SELECT * from oypoints.race WHERE year=${season} AND event_number=${number}`
+  );
+  return {
+    name: rows.map((row) => row.map).join(" + "),
+    discipline: rows.map((row) => row.discipline_id).join(" + "),
+  };
 };
 
-const getDerivation = () => {
+const getEvents = async (season) => {
+  const rows = await asyncQuery(
+    `SELECT * from oypoints.event WHERE year=${season}`
+  );
+  res = {};
   return new Promise((resolve, reject) => {
-    connection.query(
-      `SELECT * from oypoints.points_derivation`,
-      (err, rows, fields) => {
-        if (err) throw err;
-        derivation = {};
-        for (row of rows) {
-          derivation[row.points_derivation_id] = {
-            name: row.type,
-            points: row.points,
-            description: row.description,
-          };
-        }
-        resolve(derivation);
-      }
-    );
-  });
-};
-
-const getGrades = () => {
-  return new Promise((resolve, reject) => {
-    connection.query(`SELECT * FROM oypoints.grade`, (err, rows, fields) => {
-      if (err) throw err;
-      grades = {};
-      rows.forEach((row) => {
-        grades[row.grade_id] = {
-          name: row.name,
-          gender: row.gender,
-          difficulty: row.difficulty,
-        };
-      });
-      resolve(grades);
-    });
-  });
-};
-
-const getPoints = (season) => {
-  return new Promise((resolve, reject) => {
-    connection.query(
-      `SELECT * from oypoints.points WHERE year=${season}`,
-      (err, rows, fields) => {
-        if (err) throw err;
-        resolve(
-          rows
-            .map((row) => ({
-              points: row.points_generated,
-              derivation: row.points_derivation_id,
-              countsTowardsTotal: Boolean(row.counts_towards_total),
-              member: row.member_id,
-              event: row.event_number,
-            }))
-            .sort((a, b) => a.points - b.points)
+    Promise.all(rows.map((row) => getEvent(season, row.number))).then(
+      (events) => {
+        rows.forEach(
+          (_event, index) =>
+            (res[_event.number] = {
+              name: events[index].name,
+              discipline: events[index].discipline,
+              date: _event.date,
+            })
         );
+        resolve(res);
       }
     );
   });
 };
 
-const getEvent = (season, number) => {
-  return new Promise((resolve, reject) => {
-    connection.query(
-      `SELECT * from oypoints.race WHERE year=${season} AND event_number=${number}`,
-      (err, rows, fields) => {
-        if (err) throw err;
-        resolve({
-          name: rows.map((row) => row.map).join(" + "),
-          discipline: rows.map((row) => row.discipline_id).join(" + "),
-        });
-      }
-    );
-  });
+const getMemberGradeAndEligibility = async (id, season) => {
+  const rows = await asyncQuery(
+    `SELECT grade_id, eligibility_id from oypoints.member_grade WHERE member_id=${id} AND year=${season}`
+  );
+  if (rows.length) {
+    let row = rows[0];
+    return {
+      eligibility: row.eligibility_id,
+      grade: row.grade_id,
+    };
+  } else {
+    return null;
+  }
 };
 
-const getEvents = (season) => {
-  return new Promise((resolve, reject) => {
-    connection.query(
-      `SELECT * from oypoints.event WHERE year=${season}`,
-      (err, rows, fields) => {
-        if (err) throw err;
-        res = {};
-        Promise.all(rows.map((row) => getEvent(season, row.number))).then(
-          (events) => {
-            rows.forEach(
-              (_event, index) =>
-                (res[_event.number] = {
-                  name: events[index].name,
-                  discipline: events[index].discipline,
-                  date: _event.date,
-                })
-            );
-            resolve(res);
-          }
-        );
-      }
-    );
-  });
-};
-
-const getMemberGradeAndEligibility = (id, season) => {
-  return new Promise((resolve, reject) => {
-    connection.query(
-      `SELECT grade_id, eligibility_id from oypoints.member_grade WHERE member_id=${id} AND year=${season}`,
-      (err, rows, fields) => {
-        if (err) throw err;
-        if (rows.length) {
-          let row = rows[0];
-          resolve({
-            eligibility: row.eligibility_id,
-            grade: row.grade_id,
-          });
-        } else {
-          resolve(null);
-        }
-      }
-    );
-  });
-};
-
-const getSeasons = (season) => {
+const getSeasons = async (season) => {
   const countsTowardsTotal = {
     1: 1,
     2: 1,
@@ -187,71 +79,72 @@ const getSeasons = (season) => {
     8: 5,
   };
 
-  return new Promise((resolve, reject) => {
-    if (season) {
-      connection.query(
-        `SELECT * from oypoints.season WHERE year=${season}`,
-        (err, rows, fields) => {
-          if (rows.length) {
-            let row = rows[0];
-            resolve({
-              MAX_POINTS: row.max_points,
-              MIN_POINTS: row.min_points,
-              MIN_TIME_POINTS: row.min_time_points,
-              numEvents: row.num_events,
-              numEventsCount: countsTowardsTotal[row.num_events],
-              numEventsToQualify: MIN_EVENTS_TO_QUALIFY,
-              provisional: row.provisional,
-              lastEvent: row.last_event,
-            });
-          } else {
-            resolve(null);
-          }
-        }
-      );
+  if (season) {
+    let rows = await asyncQuery(
+      `SELECT * from oypoints.season WHERE year=${season}`
+    );
+    if (rows.length) {
+      let row = rows[0];
+      return {
+        MAX_POINTS: row.max_points,
+        MIN_POINTS: row.min_points,
+        MIN_TIME_POINTS: row.min_time_points,
+        numEvents: row.num_events,
+        numEventsCount: countsTowardsTotal[row.num_events],
+        numEventsToQualify: MIN_EVENTS_TO_QUALIFY,
+        provisional: row.provisional,
+        lastEvent: row.last_event,
+      };
     } else {
-      connection.query(
-        `SELECT year from oypoints.season`,
-        (err, rows, fields) => {
-          if (err) throw err;
-          resolve(rows.map((row) => row.year));
-        }
-      );
+      return null;
     }
-  });
+  } else {
+    rows = await asyncQuery(`SELECT year from oypoints.season`);
+    return rows.map((row) => row.year);
+  }
 };
+
+const getMembers = (season) =>
+  queryToObject(
+    `SELECT * from oypoints.member WHERE year=${season}`,
+    "member_id"
+  );
+
+const getGrades = () =>
+  queryToObject("SELECT * FROM oypoints.grade", "grade_id");
 
 router.get("/", (req, res) => {
   res.send("API Home");
 });
 
-router.get("/season/:year", (req, res) => {
-  getSeasons(req.params.year).then((seasons) => res.send(seasons));
-});
-
-router.get("/seasons", (req, res) => {
-  getSeasons().then((seasons) => res.send(seasons));
-});
-
-router.get("/members/:year", (req, res) => {
-  getMembers(req.params.year).then((members) => res.send(members));
-});
-
-router.get("/grades", (req, res) => {
-  getGrades().then((grades) => res.send(grades));
-});
-
-router.get("/events/:year", (req, res) => {
-  getEvents(req.params.year).then((events) => res.send(events));
-});
-
-router.get("/eligibility", (req, res) => {
-  getEligibility().then((eligibility) => res.send(eligibility));
-});
-
-router.get("/derivation", (req, res) => {
-  getDerivation().then((derivation) => res.send(derivation));
-});
+[
+  { pattern: "/season/:year", param: "year", route: getSeasons },
+  { pattern: "/seasons", route: getSeasons },
+  { pattern: "/members/:year", param: "year", route: getMembers },
+  { pattern: "/grades", route: getGrades },
+  { pattern: "/events/:year", param: "year", route: getEvents },
+  {
+    pattern: "/eligibility",
+    route: () =>
+      queryToObject("SELECT * from oypoints.eligibility", "eligibility_id"),
+  },
+  {
+    pattern: "/derivation",
+    route: () =>
+      queryToObject(
+        "SELECT * from oypoints.points_derivation",
+        "points_derivation_id"
+      ),
+  },
+].forEach(({ pattern, param, route }) =>
+  router.get(pattern, (req, res) => {
+    if (param) {
+      route(req.params[param]).then((json) => res.send(json));
+    } else {
+      route().then((json) => res.send(json));
+    }
+  })
+);
 
 router.get("/points/:year/:grade?", (req, res) => {
   getGrades(req.params.year)
