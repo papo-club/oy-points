@@ -18,10 +18,10 @@ const PointsDerivationTable = ({ derivation, season }) => (
             <td className="text-l border sm:text-2xl text-left font-title px-3 font-bold sm:whitespace-nowrap">
               {season[derivation.points] ||
                 derivation.points ||
-                (derivation.name !== "OK" && `${season["MAX_POINTS"]} - ? `) ||
+                (derivation.type !== "OK" && `${season["MAX_POINTS"]} - ? `) ||
                 `${season["MIN_TIME_POINTS"]} - ${season["MAX_POINTS"]}`}
             </td>
-            <td className="px-3 border">{derivation.name}</td>
+            <td className="px-3 border">{derivation.type}</td>
             <td className="px-3 border">{derivation.description}</td>
           </tr>
         ))}
