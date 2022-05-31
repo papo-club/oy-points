@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -14,7 +13,7 @@ const colours = [
   "#F2990C",
   "#DB5200",
   "#EB0278",
-  "#DC05FO",
+  "#DC05F0",
   "#760CF7",
   "#0005E0",
   "#0C7AF7",
@@ -23,45 +22,26 @@ const colours = [
   "#0BF741",
   "#50E000",
   "#F2F70C",
+  "#964B00",
+  "#000000",
   "#222222",
+  "#444444",
   "#666666",
+  "#888888",
   "#AAAAAA",
-  "#DDDDDD",
+  "#CCCCCC",
+  "#EEEEEE",
 ];
-
-const topX = 10;
 
 const Chart = ({
   competitors,
   domain,
   reversed,
-  events,
-  getPlacings,
+  topX,
   tickFormatter,
+  data,
 }) => {
-  const getTotalPoints = ([idevent], competitors) => {
-    let result = {};
-    Object.entries(competitors).forEach(
-      ([idcompetitor, competitor]) =>
-        (result[idcompetitor] =
-          idevent > 0 ? competitor.projectedAvg[idevent] : 0)
-    );
-    if (idevent > 0) result.event = "OY" + idevent;
-    return result;
-  };
-  const data = Object.entries(events).map(([idevent, event_]) =>
-    getPlacings(
-      Object.entries(getTotalPoints([idevent, event_], competitors)).map(
-        ([idcompetitor, points]) => ({ payload: idcompetitor, key: points })
-      )
-    )
-      .filter(({ placing }) => placing <= topX)
-      .reduce((acc, { payload, placing }) => ({ ...acc, [payload]: placing }), {
-        name: idevent,
-      })
-  );
-
-  const Graph = () => (
+  const Graph = (data) => (
     <LineChart height={500} data={data}>
       <XAxis dataKey="event" />
       <YAxis
@@ -106,7 +86,7 @@ const Chart = ({
         debounce={true}
         className="hidden sm:block"
       >
-        {Graph()}
+        {Graph(data)}
       </ResponsiveContainer>
       <ResponsiveContainer
         width="100%"
@@ -114,7 +94,7 @@ const Chart = ({
         debounce={true}
         className="block sm:hidden"
       >
-        {Graph()}
+        {Graph(data)}
       </ResponsiveContainer>
     </>
   );
