@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -9,16 +10,23 @@ import {
 } from "recharts";
 
 const colours = [
-  "#e60049",
-  "#0bb4ff",
-  "#50e991",
-  "#e6d800",
-  "#9b19f5",
-  "#ffa300",
-  "#dc0ab4",
-  "#b3d4ff",
-  "#00bfa0",
-  "#555555",
+  "#EBBB09",
+  "#F2990C",
+  "#DB5200",
+  "#EB0278",
+  "#DC05FO",
+  "#760CF7",
+  "#0005E0",
+  "#0C7AF7",
+  "#00DCF0",
+  "#00F0B0",
+  "#0BF741",
+  "#50E000",
+  "#F2F70C",
+  "#222222",
+  "#666666",
+  "#AAAAAA",
+  "#DDDDDD",
 ];
 
 const topX = 10;
@@ -28,20 +36,33 @@ const Chart = ({
   domain,
   reversed,
   events,
-  forEachEvent,
+  getPlacings,
   tickFormatter,
 }) => {
-  const topXCompetitors = competitors
-    .filter(([, competitor]) => competitor.qualified !== "INEL")
-    .slice(0, topX);
+  const getTotalPoints = ([idevent], competitors) => {
+    let result = {};
+    Object.entries(competitors).forEach(
+      ([idcompetitor, competitor]) =>
+        (result[idcompetitor] =
+          idevent > 0 ? competitor.projectedAvg[idevent] : 0)
+    );
+    if (idevent > 0) result.event = "OY" + idevent;
+    return result;
+  };
+  const data = Object.entries(events).map(([idevent, event_]) =>
+    getPlacings(
+      Object.entries(getTotalPoints([idevent, event_], competitors)).map(
+        ([idcompetitor, points]) => ({ payload: idcompetitor, key: points })
+      )
+    )
+      .filter(({ placing }) => placing <= topX)
+      .reduce((acc, { payload, placing }) => ({ ...acc, [payload]: placing }), {
+        name: idevent,
+      })
+  );
 
   const Graph = () => (
-    <LineChart
-      height={500}
-      data={Object.entries(events).map(([idevent, event_]) => {
-        return forEachEvent([idevent, event_], topXCompetitors);
-      })}
-    >
+    <LineChart height={500} data={data}>
       <XAxis dataKey="event" />
       <YAxis
         domain={domain || [1, topX]}
@@ -54,9 +75,19 @@ const Chart = ({
       />
       <Legend />
       <CartesianGrid stroke="#eee" strokeDasharray="1 1" />
-      {topXCompetitors.map(([idcompetitor, competitor], index) => (
+      {[
+        ...new Set(
+          data.reduce(
+            (acc, event) => [
+              ...acc,
+              ...Object.keys(event).slice(0, Object.keys(event).length - 1),
+            ],
+            []
+          )
+        ),
+      ].map((idcompetitor, index) => (
         <Line
-          name={`${competitor.firstName} ${competitor.lastName}`}
+          name={`${competitors[idcompetitor].firstName} ${competitors[idcompetitor].lastName}`}
           type="monotone"
           strokeWidth={4}
           key={idcompetitor}

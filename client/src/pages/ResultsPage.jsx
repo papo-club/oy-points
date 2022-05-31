@@ -13,21 +13,44 @@ const ResultsPage = ({
   const [subpage, setSubpage] = useState("points");
   const { year, grade } = useParams();
 
+  const getPlacings = (data) => {
+    const result = [];
+    let placings = [0];
+    let lastKey = null;
+    data
+      .sort(({ key: key1 }, { key: key2 }) => key2 - key1)
+      .forEach(({ payload, key }) => {
+        const lastPlacing = placings[placings.length - 1];
+        let placing;
+        if (!key) {
+          placing = undefined;
+        } else if (key === lastKey) {
+          placing = lastPlacing;
+        } else {
+          lastKey = key;
+          placing =
+            lastPlacing +
+            placings.filter((placing) => placing === lastPlacing).length;
+        }
+        placings.push(placing);
+        result.push({ payload, key, placing });
+      });
+
+    result.sort((a, b) => a.placing - b.placing);
+    return result;
+  };
+
   const season = seasons[year].season;
   const events = seasons[year].events;
-  const points = seasons[year].points[grade];
+  const competitors = seasons[year].points[grade];
 
-  const sortedCompetitors = Array.from(
-    new Map(
-      Object.entries(points).sort(
-        ([, a], [, b]) =>
-          (b.qualified !== "INEL") - (a.qualified !== "INEL") ||
-          (season.provisional
-            ? b.projectedAvg[season.lastEvent] -
-              a.projectedAvg[season.lastEvent]
-            : b.totalPoints[season.numEvents] - a.totalPoints[season.numEvents])
-      )
-    ).entries()
+  const competitorsWithPlacings = getPlacings(
+    Object.entries(competitors).map(([, competitor]) => ({
+      payload: competitor,
+      key: season.provisional
+        ? competitor.projectedAvg[season.lastEvent]
+        : competitor.totalPoints[season.numEvents],
+    }))
   );
 
   useEffect(() => {
@@ -44,7 +67,7 @@ const ResultsPage = ({
         return (
           <PointsPage
             season={season}
-            competitors={sortedCompetitors}
+            competitorsWithPlacings={competitorsWithPlacings}
             events={events}
             eligibility={eligibility}
           />
@@ -52,7 +75,8 @@ const ResultsPage = ({
       case "stats":
         return (
           <StatsPage
-            competitors={sortedCompetitors}
+            getPlacings={getPlacings}
+            competitors={competitors}
             season={season}
             events={events}
           />

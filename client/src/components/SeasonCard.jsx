@@ -7,8 +7,11 @@ const getWinner = (season, competitors) => {
       (a, b) =>
         (a.qualified !== "INEL") - (b.qualified !== "INEL") ||
         (season.provisional
-          ? a.projectedAvg[season.lastEvent] - b.projectedAvg[season.lastEvent]
-          : a.totalPoints[season.lastEvent] - b.totalPoints[season.lastEvent])
+          ? a.projectedAvg[season.lastEvent] -
+              b.projectedAvg[season.lastEvent] ||
+            Object.keys(a.results).length - Object.keys(b.results).length
+          : a.totalPoints[season.lastEvent] - b.totalPoints[season.lastEvent] ||
+            Object.keys(a.results).length - Object.keys(b.results).length)
     )
     .pop();
   return winner && winner.qualified !== "INEL"
