@@ -6,6 +6,17 @@ const derivationColors = {
   CTRL: "bg-yellow-100",
 };
 
+const getStyle = (derivationID) => {
+  switch (derivationID) {
+    case "INEL":
+      return "text-gray-400 font-normal italic";
+    case "QUAL":
+      return "text-black";
+    case "PEND":
+      return "italic";
+  }
+};
+
 const PointsPage = ({
   season,
   competitorsWithPlacings,
@@ -25,8 +36,12 @@ const PointsPage = ({
               <React.Fragment key={idevent}>
                 <th className="hidden lg:table-cell relative whitespace-nowrap rotated-header">
                   <div className="absolute bottom-0 left-0 text-left w-full">
-                    <div className="absolute bottom-0 left-0 border-b overflow-hidden text-ellipsis">
-                      OY{idevent} - {event_.name}
+                    <div className="absolute bottom-0 left-0 border-b overflow-hidden text-ellipsis leading-5">
+                      <span className="font-normal">
+                        OY{idevent} {event_.discipline}
+                      </span>
+                      <br />
+                      {event_.name}
                     </div>
                   </div>
                 </th>
@@ -44,18 +59,16 @@ const PointsPage = ({
             ({ payload: competitor, key: points, placing }, index) => (
               <tr key={competitor} className="odd:bg-white even:bg-gray-50">
                 <th
-                  className={`text-2xl sm:text-4xl text-right font-title ${
-                    competitor.qualified !== "INEL"
-                      ? "font-bold"
-                      : "font-normal italic text-gray-400"
-                  }`}
+                  className={`text-2xl sm:text-4xl text-right font-title ${getStyle(
+                    competitor.qualified
+                  )}`}
                 >
                   {competitor.qualified !== "INEL" ? placing : `(${placing})`}
                 </th>
                 <th
-                  className={`pl-4 text-sm sm:text-base font-title text-left ${
-                    competitor.qualified !== "INEL" || "text-gray-400"
-                  }`}
+                  className={`pl-4 text-sm sm:text-base font-title text-left ${getStyle(
+                    competitor.qualified
+                  )}`}
                 >
                   <div>{`${competitor.firstName} ${competitor.lastName}`}</div>
                   <div>{eligibility[competitor.qualified].type}</div>
@@ -100,7 +113,7 @@ const PointsPage = ({
                   }
                 >
                   {season.provisional
-                    ? competitor.projectedAvg[season.lastEvent]
+                    ? competitor.projectedTotal[season.lastEvent]
                     : (
                         (competitor.totalPoints[season.numEvents] * 100) /
                         (season.MAX_POINTS * season.numEventsCount)

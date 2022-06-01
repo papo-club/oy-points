@@ -24,10 +24,15 @@ const getEvent = async (season, number) => {
   const rows = await asyncQuery(
     `SELECT * from oypoints.race WHERE year=${season} AND event_number=${number}`
   );
-  return {
-    name: rows.map((row) => row.map).join(" + "),
-    discipline: rows.map((row) => row.discipline_id).join(" + "),
-  };
+  const name = rows.map((row) => row.map).join(" + ");
+  return Promise.all(rows.map((row) => getDiscipline(row.discipline_id))).then(
+    (disciplines) => ({
+      name: name,
+      discipline: disciplines
+        .map((discipline) => Object.values(discipline)[0].name)
+        .join(" + "),
+    })
+  );
 };
 
 const getEvents = async (season) => {
@@ -76,7 +81,7 @@ const getSeasons = async (season) => {
     5: 4,
     6: 4,
     7: 5,
-    8: 5,
+    8: 6,
   };
 
   if (season) {
@@ -112,6 +117,12 @@ const getMembers = (season) =>
 
 const getGrades = () =>
   queryToObject("SELECT * FROM oypoints.grade", "grade_id");
+
+const getDiscipline = (discipline_id) =>
+  queryToObject(
+    `SELECT * FROM oypoints.discipline WHERE discipline_id='${discipline_id}'`,
+    "discipline_id"
+  );
 
 router.get("/", (req, res) => {
   res.send("API Home");
@@ -165,7 +176,7 @@ router.get("/points/:year/:grade?", (req, res) => {
                   qualified: memberStatus["eligibility"],
                   results: {},
                   totalPoints: {},
-                  projectedAvg: {},
+                  projectedTotal: {},
                 };
               }
             }
@@ -225,7 +236,7 @@ router.get("/points/:year/:grade?", (req, res) => {
                       return_result[grade_id][member_id].totalPoints[
                         currentidevent
                       ] = +totalPoints.toFixed(2);
-                      return_result[grade_id][member_id].projectedAvg[
+                      return_result[grade_id][member_id].projectedTotal[
                         currentidevent
                       ] = +(
                         (totalPoints / eventsCompeted) *

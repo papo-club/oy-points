@@ -16,7 +16,7 @@ const StatsPage = ({ competitors, season, events, getPlacings }) => {
   const avgData = Object.entries(events).map(([idevent, event_]) =>
     getPlacings(
       Object.entries(
-        getAttributeByEvent("projectedAvg", [idevent, event_], competitors)
+        getAttributeByEvent("projectedTotal", [idevent, event_], competitors)
       ).map(([idcompetitor, points]) => ({
         payload: idcompetitor,
         key: points,

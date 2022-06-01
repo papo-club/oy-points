@@ -108,14 +108,17 @@ for member in members:
         "member_id": member.member_id,
         "year": season
     }
-    events_raced = len(set(
-        session.query(
-            tables.EventAdmins.event_number).filter_by(**this_member).all() +
-        session.query(
-            tables.Result.event_number).filter_by(**this_member).filter(
-            tables.Result.status != "DNS").filter(
-            tables.Result.status != "NT").all()
-    ))
+    events_raced = len(
+        set(
+            session.query(
+                tables.EventAdmins.event_number).filter_by(
+                **this_member).filter(
+                    tables.EventAdmins.event_number <= season_info.last_event).all() +
+            session.query(
+                        tables.Result.event_number).filter_by(
+                            **this_member).filter(
+                                tables.Result.status != "DNS").filter(
+                tables.Result.status != "NT").all()))
 
     # set eligibility status
     if events_raced < events_needed_so_far_to_qualify:
@@ -465,7 +468,8 @@ for member in members:
     for i, result in enumerate(results):
         # if the index is created than the amount of events that count
         # towards the total, update counts_towards_total to false
-        if i >= counts_towards_total[events.count()]:
+        if i >= counts_towards_total[events.count(
+        )] or result.points_derivation_id == "DNS":
             session.execute(
                 update(
                     tables.Points).where(

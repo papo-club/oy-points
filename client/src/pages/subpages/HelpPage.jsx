@@ -37,12 +37,12 @@ const HelpPage = ({ year, season, derivation }) => (
           How are provisional placings determined throughout the season?
         </h1>
         <p>
-          Current placings are determined using the 'projected average' score.
-          This score is calculated by multiplying the competitor's average score
+          Current placings are determined using the 'projected total' score.
+          This score is calculated by multiplying the competitor's total score
           for each event by the amount of events still to go in the season. This
           enables a fairer comparison between competitors when some have
           competed in more events than others. As the season progresses, the
-          projected average score will get closer and closer to the final score
+          projected total score will get closer and closer to the final score
           for each competitor, so placings are more likely to change near the
           beginning of the season than at the end.
         </p>

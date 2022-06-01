@@ -48,7 +48,7 @@ const ResultsPage = ({
     Object.entries(competitors).map(([, competitor]) => ({
       payload: competitor,
       key: season.provisional
-        ? competitor.projectedAvg[season.lastEvent]
+        ? competitor.projectedTotal[season.lastEvent]
         : competitor.totalPoints[season.numEvents],
     }))
   );
