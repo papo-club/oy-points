@@ -50,7 +50,7 @@ const PointsPage = ({
             ))}
             <th className="text-right w-20 pr-3">Points</th>
             <th className="text-right w-20 pr-3">
-              {season.provisional ? "Projected Avg" : "Performance"}
+              {season.provisional ? "Projected Total" : "Performance"}
             </th>
           </tr>
         </thead>
