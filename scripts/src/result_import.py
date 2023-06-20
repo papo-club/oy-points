@@ -278,10 +278,10 @@ with open(filename, "r") as csvfile:
                 )
             )
     else:
-        for grade in grades:
+        for grade in sorted(grades, key=lambda grade: grade.difficulty):
             selected_grade = prompt.List(
                 f"match grade for {grade.name}", {
-                    grade_name: grade_id for grade_id, grade_name in race_grades}).prompt()
+                    grade_name: grade_id for grade_id, grade_name in sorted(race_grades, key=lambda grade: grade[1])}).prompt()
             session.merge(
                 tables.RaceGrade(
                     year=season,
@@ -340,7 +340,7 @@ with open(filename, "r") as csvfile:
                     competitor_raw["Classifier"])
                 ],
                 raw_points=competitor_raw["Points"] or None if race.discipline_id == "SCO" else None,
-                points=competitor_raw["Score Result"] or None if race.discipline_id == "SCO" else None,
+                points=competitor_raw["Total"] or None if race.discipline_id == "SCO" else None,
             ),
         )
 

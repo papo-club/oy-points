@@ -13,13 +13,13 @@ sqlalchemy = "*"
 mysqlclient = "*"
 invalid = "*"
 sshtunnel = "*"
+python-dotenv = "*"
 
 [dev-packages]
-wemake-python-styleguide = "*"
 mypy = "*"
 
 [requires]
-python_version = "3.9"
+python_version = "3.11"
 
 [scripts]
 points = "python src/calculate_grades_and_points.py"
