@@ -81,7 +81,7 @@ const getSeasons = async (season) => {
     5: 4,
     6: 4,
     7: 5,
-    8: 6,
+    8: 5,
   };
 
   if (season) {
